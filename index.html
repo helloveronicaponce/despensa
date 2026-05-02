@@ -14,6 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@1,400;1,500&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --off-white:#FFFCF4; --black:#0F0F0F;
@@ -534,6 +535,89 @@ html,body{
 <div id="png-target"></div>
 
 <script>
+// ============================================================
+// SUPABASE — inicialização
+// ============================================================
+const SUPA_URL = "https://qwlegnebejakwwuntyrd.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bGVnbmViZWpha3d3dW50eXJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2OTUxODYsImV4cCI6MjA5MTI3MTE4Nn0.lkYjF5xXwS_XW8Wi-p0YBBOxY7Bjs_HDw7PIWDTcPYQ";
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+let dbReady = false; // true depois que carregar dados do banco
+
+// ── DESPENSA ─────────────────────────────────────────────────
+
+async function loadDespensa(){
+  const {data, error} = await sb.from("cozinha_despensa").select("*").order("category").order("name");
+  if(error){ console.warn("Erro ao carregar despensa:", error); return; }
+  if(data && data.length > 0){
+    pantry = data.map(r=>({
+      id: r.id,
+      name: r.name,
+      qty: parseFloat(r.qty),
+      unit: r.unit,
+      category: r.category
+    }));
+  }
+}
+
+async function savePantryItem(item){
+  const {error} = await sb.from("cozinha_despensa").upsert({
+    name: item.name,
+    qty: item.qty,
+    unit: item.unit,
+    category: item.category
+  }, {onConflict: "name"});
+  if(error) console.warn("Erro ao salvar item:", error);
+}
+
+async function deletePantryItem(name){
+  const {error} = await sb.from("cozinha_despensa").delete().eq("name", name);
+  if(error) console.warn("Erro ao deletar item:", error);
+}
+
+// ── CARDÁPIO ─────────────────────────────────────────────────
+
+async function loadCardapio(){
+  const {data, error} = await sb.from("cozinha_cardapio").select("*");
+  if(error){ console.warn("Erro ao carregar cardápio:", error); return; }
+  if(data){
+    week = Array.from({length:7},()=>[null,null,null,null]);
+    data.forEach(r=>{
+      if(r.day_index >= 0 && r.day_index < 7 && r.meal_index >= 0 && r.meal_index < 4){
+        week[r.day_index][r.meal_index] = r.recipe_id;
+      }
+    });
+  }
+}
+
+async function saveCardapioSlot(dayIdx, mealIdx, recipeId){
+  const recipe = recipeId ? recipes.find(r=>r.id===recipeId) : null;
+  if(recipeId === null){
+    // remove o slot
+    await sb.from("cozinha_cardapio").delete()
+      .eq("day_index", dayIdx).eq("meal_index", mealIdx);
+  } else {
+    await sb.from("cozinha_cardapio").upsert({
+      day_index: dayIdx,
+      meal_index: mealIdx,
+      recipe_id: recipeId,
+      recipe_name: recipe ? recipe.name : null
+    }, {onConflict: "day_index,meal_index"});
+  }
+}
+
+async function clearCardapioDB(){
+  await sb.from("cozinha_cardapio").delete().neq("id","00000000-0000-0000-0000-000000000000");
+}
+
+// ── BOOT: carrega tudo do banco ───────────────────────────────
+async function loadFromDB(){
+  showToast("Carregando dados…");
+  await Promise.all([loadDespensa(), loadCardapio()]);
+  dbReady = true;
+  renderAll();
+  showToast("Dados carregados ✓");
+}
 const UNITS=["un","kg","g","L","ml","cx","pct","dente","fatia"];
 const CATEGORIES=["Hortifrúti","Proteínas","Laticínios","Grãos","Bebidas","Higiene","Limpeza","Outros"];
 const DIAS=["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
@@ -868,7 +952,10 @@ function renderPickerList(q){
       <div class="picker-item-meta">${r.time} · ${r.serves}p</div>
     `;
     item.addEventListener("click",()=>{
-      if(pickerDay!==null) week[pickerDay][pickerMeal]=r.id;
+      if(pickerDay!==null){
+        week[pickerDay][pickerMeal]=r.id;
+        if(dbReady) saveCardapioSlot(pickerDay, pickerMeal, r.id);
+      }
       closePicker();
       renderAll();
     });
@@ -1086,8 +1173,8 @@ document.getElementById("add-form").addEventListener("submit",e=>{
   const category=document.getElementById("add-category").value;
   if(!name||isNaN(qty)) return;
   const existing=findInPantry(name);
-  if(existing){existing.qty+=qty;}
-  else {pantry.push({name,qty,unit,category});}
+  if(existing){existing.qty+=qty; if(dbReady) savePantryItem(existing);}
+  else {const item={name,qty,unit,category}; pantry.push(item); if(dbReady) savePantryItem(item);}
   e.target.reset();
   document.getElementById("add-name").focus();
   renderAll();
@@ -1118,8 +1205,9 @@ document.getElementById("pantry-list-root").addEventListener("click",e=>{
       if(!isNaN(raw) && raw>=0){
         item.qty=Math.round(raw*10)/10;
         if(item.qty===0 && !PRIORITY.has(item.name)){
+          if(dbReady) deletePantryItem(item.name);
           pantry=pantry.filter(p=>p!==item);
-        }
+        } else if(dbReady) savePantryItem(item);
       }
       renderAll();
     };
@@ -1132,12 +1220,13 @@ document.getElementById("pantry-list-root").addEventListener("click",e=>{
     return;
   }
 
-  if(action==="inc") item.qty=Math.round((item.qty+1)*10)/10;
+  if(action==="inc"){ item.qty=Math.round((item.qty+1)*10)/10; if(dbReady) savePantryItem(item); }
   if(action==="dec"){
     item.qty=Math.max(0,Math.round((item.qty-1)*10)/10);
-    if(item.qty===0 && !PRIORITY.has(item.name)) pantry=pantry.filter(p=>p!==item);
+    if(item.qty===0 && !PRIORITY.has(item.name)){ if(dbReady) deletePantryItem(item.name); pantry=pantry.filter(p=>p!==item); }
+    else if(dbReady) savePantryItem(item);
   }
-  if(action==="del") pantry=pantry.filter(p=>p!==item);
+  if(action==="del"){ if(dbReady) deletePantryItem(item.name); pantry=pantry.filter(p=>p!==item); }
   renderAll();
 });
 
@@ -1172,6 +1261,7 @@ document.getElementById("menu-week").addEventListener("click",e=>{
     const meal=parseInt(btn.dataset.meal);
     if(btn.dataset.action==="clear"){
       week[day][meal]=null;
+      if(dbReady) saveCardapioSlot(day, meal, null);
       renderAll();
       return;
     }
@@ -1203,6 +1293,7 @@ document.getElementById("picker-overlay").addEventListener("click",e=>{
 // Limpar semana
 document.getElementById("clear-week").addEventListener("click",()=>{
   week=Array.from({length:7},()=>[null,null,null,null]);
+  if(dbReady) clearCardapioDB();
   renderAll();
 });
 
@@ -1365,7 +1456,8 @@ if("serviceWorker" in navigator){
   navigator.serviceWorker.register("./sw.js").catch(()=>{});
 }
 
-renderAll();
+// Boot — carrega dados do Supabase
+loadFromDB();
 </script>
 
 </body>
