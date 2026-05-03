@@ -538,85 +538,66 @@ html,body{
 // ============================================================
 // SUPABASE — inicialização
 // ============================================================
+// SUPABASE — inicialização
+// ============================================================
 const SUPA_URL = "https://qwlegnebejakwwuntyrd.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bGVnbmViZWpha3d3dW50eXJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2OTUxODYsImV4cCI6MjA5MTI3MTE4Nn0.lkYjF5xXwS_XW8Wi-p0YBBOxY7Bjs_HDw7PIWDTcPYQ";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-let dbReady = false; // true depois que carregar dados do banco
+let dbReady = false;
 
-// ── DESPENSA ─────────────────────────────────────────────────
-
-async function loadDespensa(){
-  const {data, error} = await sb.from("cozinha_despensa").select("*").order("category").order("name");
-  if(error){ console.warn("Erro ao carregar despensa:", error); return; }
-  if(data && data.length > 0){
-    pantry = data.map(r=>({
-      id: r.id,
-      name: r.name,
-      qty: parseFloat(r.qty),
-      unit: r.unit,
-      category: r.category
-    }));
-  }
-}
-
-async function savePantryItem(item){
-  const {error} = await sb.from("cozinha_despensa").upsert({
-    name: item.name,
-    qty: item.qty,
-    unit: item.unit,
-    category: item.category
-  }, {onConflict: "name"});
-  if(error) console.warn("Erro ao salvar item:", error);
-}
-
-async function deletePantryItem(name){
-  const {error} = await sb.from("cozinha_despensa").delete().eq("name", name);
-  if(error) console.warn("Erro ao deletar item:", error);
-}
-
-// ── CARDÁPIO ─────────────────────────────────────────────────
+// ── CARDÁPIO — lê recipe_name (texto livre) do banco ─────────
 
 async function loadCardapio(){
-  const {data, error} = await sb.from("cozinha_cardapio").select("*");
+  const {data, error} = await sb
+    .from("cozinha_cardapio")
+    .select("day_index, meal_index, recipe_name")
+    .order("day_index").order("meal_index");
   if(error){ console.warn("Erro ao carregar cardápio:", error); return; }
   if(data){
     week = Array.from({length:7},()=>[null,null,null,null]);
     data.forEach(r=>{
       if(r.day_index >= 0 && r.day_index < 7 && r.meal_index >= 0 && r.meal_index < 4){
-        week[r.day_index][r.meal_index] = r.recipe_id;
+        week[r.day_index][r.meal_index] = r.recipe_name || null;
       }
     });
   }
 }
 
-async function saveCardapioSlot(dayIdx, mealIdx, recipeId){
-  const recipe = recipeId ? recipes.find(r=>r.id===recipeId) : null;
-  if(recipeId === null){
-    // remove o slot
+async function saveCardapioSlot(dayIdx, mealIdx, recipeName){
+  if(!recipeName){
     await sb.from("cozinha_cardapio").delete()
       .eq("day_index", dayIdx).eq("meal_index", mealIdx);
   } else {
     await sb.from("cozinha_cardapio").upsert({
       day_index: dayIdx,
       meal_index: mealIdx,
-      recipe_id: recipeId,
-      recipe_name: recipe ? recipe.name : null
+      recipe_id: null,
+      recipe_name: recipeName
     }, {onConflict: "day_index,meal_index"});
   }
 }
 
 async function clearCardapioDB(){
-  await sb.from("cozinha_cardapio").delete().neq("id","00000000-0000-0000-0000-000000000000");
+  await sb.from("cozinha_cardapio")
+    .delete().gte("day_index", 0);
 }
+
+async function loadFromDB(){
+  showToast("Carregando cardápio…");
+  await loadCardapio();
+  dbReady = true;
+  renderAll();
+  showToast("Cardápio carregado ✓");
+}}
 
 // ── BOOT: carrega tudo do banco ───────────────────────────────
 async function loadFromDB(){
-  showToast("Carregando dados…");
-  await Promise.all([loadDespensa(), loadCardapio()]);
+  showToast("Carregando cardápio…");
+  await loadCardapio();
   dbReady = true;
   renderAll();
-  showToast("Dados carregados ✓");
+  showToast("Cardápio carregado ✓");
 }
 const UNITS=["un","kg","g","L","ml","cx","pct","dente","fatia"];
 const CATEGORIES=["Hortifrúti","Proteínas","Laticínios","Grãos","Bebidas","Higiene","Limpeza","Outros"];
@@ -863,25 +844,20 @@ function renderWeek(){
     mealsGrid.className="menu-day-meals";
 
     for(let m=0;m<REFEICOES.length;m++){
-      const recipeId=week[i][m];
-      const recipe=recipeId?recipes.find(r=>r.id===recipeId):null;
+      const recipeName=week[i][m]; // agora é string ou null
       const card=document.createElement("div");
-      card.className="meal-card"+(recipe?" has-recipe":"");
+      card.className="meal-card"+(recipeName?" has-recipe":"");
       card.dataset.day=i;
       card.dataset.meal=m;
 
-      if(recipe){
+      if(recipeName){
         total++;
-        const st=recipeStatus(recipe);
-        if(st.status==="almost") card.classList.add("is-almost");
-        if(st.status==="missing") card.classList.add("is-missing");
         card.innerHTML=`
           <div class="meal-card-label">
             <span class="meal-card-label-emoji">${MEAL_EMOJI[m]}</span>
             ${REFEICOES_LABEL[REFEICOES[m]]}
           </div>
-          <div class="meal-card-recipe">${recipe.name}</div>
-          <div class="meal-card-info">${recipe.time} · ${recipe.serves}p</div>
+          <div class="meal-card-recipe">${recipeName}</div>
           <div class="meal-card-actions">
             <button class="meal-card-btn" data-action="change" data-day="${i}" data-meal="${m}">Trocar</button>
             <button class="meal-card-btn is-remove" data-action="clear" data-day="${i}" data-meal="${m}">✕</button>
@@ -936,15 +912,35 @@ function renderPickerList(q){
     return a.name.localeCompare(b.name,"pt-BR");
   });
 
+  // Se tem texto mas nenhum match, mostra opção de salvar texto livre
   if(list.length===0){
-    root.innerHTML=`<div class="picker-empty">Nenhuma receita encontrada.</div>`;
+    if(q.trim()){
+      const freeItem=document.createElement("div");
+      freeItem.className="picker-item";
+      freeItem.innerHTML=`
+        <div class="picker-badge" style="background:var(--lime);color:var(--black);font-size:14px">+</div>
+        <div class="picker-item-name">Salvar "<strong>${q.trim()}</strong>"</div>
+        <div class="picker-item-meta">texto livre</div>
+      `;
+      freeItem.addEventListener("click",()=>{
+        if(pickerDay!==null){
+          week[pickerDay][pickerMeal]=q.trim();
+          if(dbReady) saveCardapioSlot(pickerDay, pickerMeal, q.trim());
+        }
+        closePicker();
+        renderAll();
+      });
+      root.appendChild(freeItem);
+    } else {
+      root.innerHTML=`<div class="picker-empty">Nenhuma receita encontrada.</div>`;
+    }
     return;
   }
 
-  const currentId=pickerDay!==null?week[pickerDay][pickerMeal]:null;
+  const currentName=pickerDay!==null?week[pickerDay][pickerMeal]:null;
   for(const r of list){
     const item=document.createElement("div");
-    item.className="picker-item"+(r.id===currentId?" is-active":"");
+    item.className="picker-item"+(r.name===currentName?" is-active":"");
     const badgeEmoji=r.status==="ready"?"✓":r.status==="almost"?"~":"—";
     item.innerHTML=`
       <div class="picker-badge ${r.status}">${badgeEmoji}</div>
@@ -953,8 +949,8 @@ function renderPickerList(q){
     `;
     item.addEventListener("click",()=>{
       if(pickerDay!==null){
-        week[pickerDay][pickerMeal]=r.id;
-        if(dbReady) saveCardapioSlot(pickerDay, pickerMeal, r.id);
+        week[pickerDay][pickerMeal]=r.name;
+        if(dbReady) saveCardapioSlot(pickerDay, pickerMeal, r.name);
       }
       closePicker();
       renderAll();
@@ -970,25 +966,9 @@ function closePicker(){
 }
 
 function buildList(){
-  const needed={};
-  for(let i=0;i<7;i++){
-    for(let m=0;m<REFEICOES.length;m++){
-      const dayId=week[i][m];
-      if(!dayId) continue;
-      const r=recipes.find(x=>x.id===dayId);
-      if(!r) continue;
-      for(const ing of r.ingredients){
-        const inP=findInPantry(ing.name);
-        const have=inP?inP.qty:0;
-        const missing=Math.max(0,ing.qty-have);
-        if(missing>0){
-          if(!needed[ing.name]) needed[ing.name]={name:ing.name,qty:0,unit:ing.unit};
-          needed[ing.name].qty+=missing;
-        }
-      }
-    }
-  }
-  return Object.values(needed);
+  // O cardápio agora é texto livre — sem cruzamento com ingredientes
+  // A lista de compras das receitas fica vazia (gerenciada manualmente)
+  return [];
 }
 function buildPriorityList(){
   const out=[];
@@ -1220,8 +1200,8 @@ document.getElementById("add-form").addEventListener("submit",e=>{
   const category=document.getElementById("add-category").value;
   if(!name||isNaN(qty)) return;
   const existing=findInPantry(name);
-  if(existing){existing.qty+=qty; if(dbReady) savePantryItem(existing);}
-  else {const item={name,qty,unit,category}; pantry.push(item); if(dbReady) savePantryItem(item);}
+  if(existing){existing.qty+=qty;}
+  else {pantry.push({name,qty,unit,category});}
   e.target.reset();
   document.getElementById("add-name").focus();
   renderAll();
@@ -1252,9 +1232,8 @@ document.getElementById("pantry-list-root").addEventListener("click",e=>{
       if(!isNaN(raw) && raw>=0){
         item.qty=Math.round(raw*10)/10;
         if(item.qty===0 && !PRIORITY.has(item.name)){
-          if(dbReady) deletePantryItem(item.name);
           pantry=pantry.filter(p=>p!==item);
-        } else if(dbReady) savePantryItem(item);
+        }
       }
       renderAll();
     };
@@ -1267,13 +1246,12 @@ document.getElementById("pantry-list-root").addEventListener("click",e=>{
     return;
   }
 
-  if(action==="inc"){ item.qty=Math.round((item.qty+1)*10)/10; if(dbReady) savePantryItem(item); }
+  if(action==="inc"){ item.qty=Math.round((item.qty+1)*10)/10; }
   if(action==="dec"){
     item.qty=Math.max(0,Math.round((item.qty-1)*10)/10);
-    if(item.qty===0 && !PRIORITY.has(item.name)){ if(dbReady) deletePantryItem(item.name); pantry=pantry.filter(p=>p!==item); }
-    else if(dbReady) savePantryItem(item);
+    if(item.qty===0 && !PRIORITY.has(item.name)){ pantry=pantry.filter(p=>p!==item); }
   }
-  if(action==="del"){ if(dbReady) deletePantryItem(item.name); pantry=pantry.filter(p=>p!==item); }
+  if(action==="del"){ pantry=pantry.filter(p=>p!==item); }
   renderAll();
 });
 
@@ -1399,17 +1377,13 @@ function exportPNG(){
         <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
     `;
     for(let m=0;m<4;m++){
-      const rid=week[i][m];
-      const recipe=rid?recipes.find(r=>r.id===rid):null;
-      if(recipe){
-        const st=recipeStatus(recipe);
-        const bar=STATUS_COLOR[st.status]||"#ccc";
+      const recipeName=week[i][m];
+      if(recipeName){
         html+=`
           <div style="background:#fff;border:1.5px solid #e0e0e0;border-radius:12px;padding:12px 14px;position:relative;overflow:hidden">
-            <div style="position:absolute;top:0;left:12px;right:12px;height:3px;background:${bar};border-radius:0 0 3px 3px"></div>
+            <div style="position:absolute;top:0;left:12px;right:12px;height:3px;background:var(--lime,#D4FF3D);border-radius:0 0 3px 3px"></div>
             <div style="font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#999;margin-bottom:4px">${MEAL_LABELS[m]}</div>
-            <div style="font-weight:900;font-size:13px;letter-spacing:-0.01em;line-height:1.2">${recipe.name}</div>
-            <div style="font-style:italic;color:#888;font-size:11px;margin-top:3px;font-family:'EB Garamond',Georgia,serif">${recipe.time} · ${recipe.serves}p</div>
+            <div style="font-weight:900;font-size:13px;letter-spacing:-0.01em;line-height:1.2">${recipeName}</div>
           </div>
         `;
       } else {
