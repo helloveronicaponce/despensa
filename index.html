@@ -1080,24 +1080,10 @@ function renderList(){
   root.innerHTML="";
   const items = buildUnifiedList();
 
-  // Contadores
-  const totalSemana = items.filter(i=>i.tags.includes("Semana")).length;
-  const totalCasa = items.filter(i=>i.tags.some(t=>t!=="Semana")).length;
-
-  // Cabeçalho
-  const head=document.createElement("div");
-  head.className="list-section-head";
-  head.innerHTML=`
-    <div>
-      <h2 class="section-title">Lista de Compras</h2>
-      <p class="section-sub">O que falta para a semana — e o que falta da casa.</p>
-    </div>
-    <div class="list-section-count">${items.length}</div>
-  `;
+  document.getElementById("count-list").textContent=items.length;
 
   if(items.length===0){
     root.innerHTML=`<div class="empty-state"><h3>Tudo em ordem!</h3><p>Sua despensa está abastecida e o cardápio está coberto.</p></div>`;
-    document.getElementById("count-list").textContent=0;
     return;
   }
 
@@ -1112,7 +1098,6 @@ function renderList(){
 
   const section=document.createElement("div");
   section.className="list-section";
-  section.appendChild(head);
 
   const catsGrid=document.createElement("div");
   catsGrid.className="list-cats-grid";
@@ -1155,7 +1140,6 @@ function renderList(){
   }
   section.appendChild(catsGrid);
   root.appendChild(section);
-  document.getElementById("count-list").textContent=items.length;
 }
 
 function openModal(recipeId){
