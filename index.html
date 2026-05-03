@@ -537,6 +537,9 @@ html,body{
         <button class="filter-pill" data-filter="cat:Café da Manhã">☕ Café da Manhã</button>
         <button class="filter-pill" data-filter="cat:Lanches">🥪 Lanches</button>
         <button class="filter-pill" data-filter="cat:Doces">🍮 Doces</button>
+        <button class="filter-pill" data-filter="time:fast">⚡ Rápidas (até 20min)</button>
+        <button class="filter-pill" data-filter="time:medium">⏱ Médias (21-45min)</button>
+        <button class="filter-pill" data-filter="time:slow">🕐 Demoradas (45min+)</button>
         <button class="filter-pill" data-filter="ready">✓ Posso fazer</button>
         <button class="filter-pill" data-filter="almost">~ Quase lá</button>
         <button class="filter-pill" data-filter="missing">✕ Falta muito</button>
@@ -972,10 +975,19 @@ function renderRecipes(){
     visible=visible.filter(r=>r.name.toLowerCase().includes(q));
   }
 
-  // Filtro de categoria ou status
+  // Filtro de categoria, tempo ou status
   if(recipeFilter.startsWith("cat:")){
     const cat=recipeFilter.slice(4);
     visible=visible.filter(r=>r.category===cat);
+  } else if(recipeFilter.startsWith("time:")){
+    const bucket=recipeFilter.slice(5);
+    visible=visible.filter(r=>{
+      const mins=parseInt(r.time)||0;
+      if(bucket==="fast") return mins<=20;
+      if(bucket==="medium") return mins>20 && mins<=45;
+      if(bucket==="slow") return mins>45;
+      return true;
+    });
   } else if(recipeFilter==="ready") visible=visible.filter(r=>r.status==="ready");
   else if(recipeFilter==="almost") visible=visible.filter(r=>r.status==="almost");
   else if(recipeFilter==="missing") visible=visible.filter(r=>r.status==="missing");
