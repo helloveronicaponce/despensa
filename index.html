@@ -578,21 +578,12 @@ async function clearCardapioDB(){
 }
 
 async function loadFromDB(){
-  showToast("Carregando cardápio…");
-  await loadCardapio();
+  await Promise.all([loadDespensa(), loadCardapio()]);
   dbReady = true;
   renderAll();
-  showToast("Cardápio carregado ✓");
-}}
+}
 
-// ============================================================
-// SUPABASE
-// ============================================================
-const SUPA_URL = "https://qwlegnebejakwwuntyrd.supabase.co";
-const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bGVnbmViZWpha3d3dW50eXJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2OTUxODYsImV4cCI6MjA5MTI3MTE4Nn0.lkYjF5xXwS_XW8Wi-p0YBBOxY7Bjs_HDw7PIWDTcPYQ";
-const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-let dbReady = false;
 
 // ── DESPENSA ─────────────────────────────────────────────────
 
