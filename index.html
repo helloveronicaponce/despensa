@@ -1021,71 +1021,118 @@ function renderList(){
   const recipeList=buildList();
   const priorityList=buildPriorityList();
   root.innerHTML="";
-  const prioritySection=document.createElement("div");
-  prioritySection.className="list-section is-priority";
-  prioritySection.innerHTML=`
-    <div class="list-section-head">
-      <div>
-        <div class="list-section-title">Lista padrão da casa</div>
-        <div class="list-section-sub">Itens essenciais que estão em falta ou abaixo do mínimo.</div>
-      </div>
-      <div class="list-section-count" style="color:var(--lime)">${priorityList.length}</div>
-    </div>
-    <div class="list-items"></div>
-  `;
-  const pItems=prioritySection.querySelector(".list-items");
-  if(priorityList.length===0){
-    pItems.innerHTML=`<div class="italic" style="color:rgba(255,252,244,0.6);padding:16px 0">Tudo em ordem por aqui.</div>`;
-  } else {
-    for(const item of priorityList){
-      const row=document.createElement("div");
-      const key="prio-"+item.name;
-      row.className=`list-item ${checkedItems.has(key)?"checked":""}`;
-      row.dataset.key=key;
-      const reasonLabel=item.reason==="essential"?"Essencial":item.reason==="zero"?"Zerado":"Baixo";
-      const reasonColor=item.reason==="essential"?"var(--lime)":item.reason==="zero"?"var(--pink)":"rgba(255,252,244,0.3)";
-      row.innerHTML=`
-        <div class="list-checkbox"></div>
-        <div class="list-item-name">${item.name}</div>
-        <div class="list-item-qty">${fmtQty(item.qty)} ${item.unit}</div>
-        <span style="padding:2px 8px;border-radius:999px;font-size:8px;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;background:${reasonColor};color:${item.reason==="essential"?"var(--black)":"var(--off-white)"};flex-shrink:0">${reasonLabel}</span>
-      `;
-      pItems.appendChild(row);
-    }
-  }
-  root.appendChild(prioritySection);
 
-  const recipeSection=document.createElement("div");
-  recipeSection.className="list-section";
-  recipeSection.innerHTML=`
-    <div class="list-section-head">
-      <div>
-        <div class="list-section-title">Para as receitas da semana</div>
-        <div class="list-section-sub">O que falta para fazer o que você planejou.</div>
-      </div>
-      <div class="list-section-count">${recipeList.length}</div>
-    </div>
-    <div class="list-items"></div>
-  `;
-  const rItems=recipeSection.querySelector(".list-items");
-  if(recipeList.length===0){
-    const totalSlots=week.flat().filter(x=>x).length;
-    rItems.innerHTML=`<div class="italic" style="color:var(--black-60);padding:16px 0">${totalSlots===0?"Adicione refeições ao cardápio para gerar a lista.":"Você já tem tudo. Pode cozinhar."}</div>`;
-  } else {
-    for(const item of recipeList){
-      const row=document.createElement("div");
-      const key="rec-"+item.name;
-      row.className=`list-item ${checkedItems.has(key)?"checked":""}`;
-      row.dataset.key=key;
-      row.innerHTML=`
-        <div class="list-checkbox"></div>
-        <div class="list-item-name">${item.name}</div>
-        <div class="list-item-qty">${fmtQty(item.qty)} ${item.unit}</div>
-      `;
-      rItems.appendChild(row);
+  // ── Helper: renderiza um bloco de itens agrupados por categoria ──
+  function renderBlock({title, sub, items, dark, countColor}){
+    const section=document.createElement("div");
+    section.className="list-section"+(dark?" is-priority":"");
+
+    // Agrupa por categoria
+    const byCat={};
+    for(const item of items){
+      const cat=item.category||"Outros";
+      if(!byCat[cat]) byCat[cat]=[];
+      byCat[cat].push(item);
     }
+    const cats=CATEGORIES.filter(c=>byCat[c]);
+
+    // Cabeçalho do bloco
+    const head=document.createElement("div");
+    head.className="list-section-head";
+    head.innerHTML=`
+      <div>
+        <div class="list-section-title">${title}</div>
+        <div class="list-section-sub">${sub}</div>
+      </div>
+      <div class="list-section-count" ${countColor?`style="color:${countColor}"`:""}>${items.length}</div>
+    `;
+    section.appendChild(head);
+
+    if(items.length===0){
+      const empty=document.createElement("div");
+      empty.className="italic";
+      empty.style.cssText=`color:${dark?"rgba(255,252,244,0.6)":"var(--black-60)"};padding:16px 0`;
+      empty.textContent=title.includes("receita")
+        ?(week.flat().filter(x=>x).length===0?"Adicione refeições ao cardápio para gerar a lista.":"Você já tem tudo. Pode cozinhar.")
+        :"Tudo em ordem por aqui.";
+      section.appendChild(empty);
+      root.appendChild(section);
+      return;
+    }
+
+    // Categorias
+    for(const cat of cats){
+      const catItems=byCat[cat];
+
+      // Label da categoria
+      const catLabel=document.createElement("div");
+      catLabel.style.cssText=`
+        font-family:var(--font-display);font-weight:900;
+        font-size:11px;letter-spacing:0.08em;text-transform:uppercase;
+        color:${dark?"rgba(255,252,244,0.5)":"var(--black-40)"};
+        padding:14px 0 6px;
+        border-top:1px solid ${dark?"rgba(255,252,244,0.1)":"var(--rule)"};
+        margin-top:4px;
+      `;
+      catLabel.textContent=cat;
+      section.appendChild(catLabel);
+
+      const grid=document.createElement("div");
+      grid.className="list-items";
+      section.appendChild(grid);
+
+      for(const item of catItems){
+        const prefix=dark?"prio":"rec";
+        const key=`${prefix}-${item.name}`;
+        const row=document.createElement("div");
+        row.className=`list-item ${checkedItems.has(key)?"checked":""}`;
+        row.dataset.key=key;
+
+        let badgeHtml="";
+        if(dark && item.reason){
+          const reasonLabel=item.reason==="essential"?"Essencial":item.reason==="zero"?"Zerado":"Baixo";
+          const reasonBg=item.reason==="essential"?"var(--lime)":item.reason==="zero"?"var(--pink)":"rgba(255,252,244,0.25)";
+          const reasonFg=item.reason==="essential"?"var(--black)":"var(--off-white)";
+          badgeHtml=`<span style="padding:2px 8px;border-radius:999px;font-size:8px;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;background:${reasonBg};color:${reasonFg};flex-shrink:0">${reasonLabel}</span>`;
+        }
+
+        row.innerHTML=`
+          <div class="list-checkbox"></div>
+          <div class="list-item-name">${item.name}</div>
+          <div class="list-item-qty">${fmtQty(item.qty)} ${item.unit}</div>
+          ${badgeHtml}
+        `;
+        grid.appendChild(row);
+      }
+    }
+
+    root.appendChild(section);
   }
-  root.appendChild(recipeSection);
+
+  // ── Bloco 1: Lista padrão da casa ────────────────────────────
+  renderBlock({
+    title:"Lista padrão da casa",
+    sub:"Itens essenciais que estão em falta ou abaixo do mínimo.",
+    items:priorityList,
+    dark:true,
+    countColor:"var(--lime)"
+  });
+
+  // ── Bloco 2: Receitas da semana ───────────────────────────────
+  // Enriquecer recipeList com categoria (busca na despensa ou fallback)
+  const enriched=recipeList.map(item=>{
+    const inP=findInPantry(item.name);
+    return {...item, category: inP?inP.category:"Outros"};
+  });
+
+  renderBlock({
+    title:"Para as receitas da semana",
+    sub:"O que falta para fazer o que você planejou.",
+    items:enriched,
+    dark:false,
+    countColor:null
+  });
+
   document.getElementById("count-list").textContent=recipeList.length+priorityList.length;
 }
 
@@ -1407,35 +1454,56 @@ function exportPNG(){
 // ============================================================
 function copyList(){
   const priority=buildPriorityList();
-  const receitas=buildList();
+  const recipeList=buildList().map(item=>{
+    const inP=findInPantry(item.name);
+    return {...item, category: inP?inP.category:"Outros"};
+  });
+
   let text="🛒 *Lista de Compras*\n";
   const today=new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"});
   text+=`_${today}_\n`;
 
+  function groupByCat(items){
+    const byCat={};
+    for(const item of items){
+      const cat=item.category||"Outros";
+      if(!byCat[cat]) byCat[cat]=[];
+      byCat[cat].push(item);
+    }
+    return byCat;
+  }
+
   if(priority.length>0){
     text+="\n🏠 *Casa & Essenciais*\n";
-    for(const item of priority){
-      text+=`• ${item.name} — ${fmtQty(item.qty)} ${item.unit}\n`;
+    const byCat=groupByCat(priority);
+    for(const cat of CATEGORIES.filter(c=>byCat[c])){
+      text+=`\n_${cat}_\n`;
+      for(const item of byCat[cat]){
+        text+=`• ${item.name} — ${fmtQty(item.qty)} ${item.unit}\n`;
+      }
     }
   }
 
-  if(receitas.length>0){
+  if(recipeList.length>0){
     text+="\n🍽 *Para as receitas da semana*\n";
-    for(const item of receitas){
-      text+=`• ${item.name} — ${fmtQty(item.qty)} ${item.unit}\n`;
+    const byCat=groupByCat(recipeList);
+    for(const cat of CATEGORIES.filter(c=>byCat[c])){
+      text+=`\n_${cat}_\n`;
+      for(const item of byCat[cat]){
+        text+=`• ${item.name} — ${fmtQty(item.qty)} ${item.unit}\n`;
+      }
     }
   }
 
-  if(priority.length===0 && receitas.length===0){
+  if(priority.length===0 && recipeList.length===0){
     text+="\n✅ Tudo em ordem! Nada para comprar.";
   }
 
-  text+="\n_Gerado pela Despensa Inteligente_";
+  text+="\n_Gerado pela Cozinha Inteligente_";
 
   navigator.clipboard.writeText(text).then(()=>{
     showToast("Lista copiada! Cole no WhatsApp.");
   }).catch(()=>{
-    // fallback
     const ta=document.createElement("textarea");
     ta.value=text;
     ta.style.position="fixed";ta.style.left="-9999px";
