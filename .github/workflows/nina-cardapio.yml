@@ -1,0 +1,36 @@
+name: Nina — Cardápio Semanal
+
+on:
+  schedule:
+    # Todo domingo às 06:00 UTC = 03:00 Brasília (horário de verão)
+    # ou 03:00 Brasília em horário normal (UTC-3)
+    - cron: '0 6 * * 0'
+  
+  # Permite rodar manualmente pelo GitHub para testar
+  workflow_dispatch:
+
+jobs:
+  montar-cardapio:
+    name: Montar cardápio da semana
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: pip install requests
+
+      - name: Nina monta e publica o cardápio
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          NINA_API_KEY: ${{ secrets.NINA_API_KEY }}
+        run: python scripts/nina_cardapio.py
