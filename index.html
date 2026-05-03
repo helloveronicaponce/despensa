@@ -757,37 +757,39 @@ let dbReady = false;
 async function loadCardapio(){
   const {data, error} = await sb
     .from("cozinha_cardapio")
-    .select("day_index, meal_index, recipe_name")
+    .select("day_index, meal_index, recipe_name, recipe_names")
     .order("day_index").order("meal_index");
   if(error){ console.warn("Erro ao carregar cardápio:", error); return; }
   if(data){
     week = Array.from({length:7},()=>[[],[],[],[]]);
+    // Agrupa todas as linhas por (day_index, meal_index)
+    // Cada linha pode ter recipe_names (array com 1 nome) ou recipe_name (string legado)
     data.forEach(r=>{
-      if(r.day_index >= 0 && r.day_index < 7 && r.meal_index >= 0 && r.meal_index < 4){
-        // Suporta tanto recipe_names (novo) quanto recipe_name (legado)
-        if(Array.isArray(r.recipe_names) && r.recipe_names.length > 0){
-          week[r.day_index][r.meal_index] = r.recipe_names;
-        } else if(r.recipe_name){
-          week[r.day_index][r.meal_index] = [r.recipe_name];
-        }
+      const d=r.day_index, m=r.meal_index;
+      if(d<0||d>6||m<0||m>3) return;
+      if(Array.isArray(r.recipe_names) && r.recipe_names.length>0){
+        r.recipe_names.forEach(name=>{ if(name && !week[d][m].includes(name)) week[d][m].push(name); });
+      } else if(r.recipe_name){
+        if(!week[d][m].includes(r.recipe_name)) week[d][m].push(r.recipe_name);
       }
     });
   }
 }
 
 async function saveCardapioSlot(dayIdx, mealIdx, names){
-  // names = array de strings
-  if(!names || names.length === 0){
-    await sb.from("cozinha_cardapio").delete()
-      .eq("day_index", dayIdx).eq("meal_index", mealIdx);
-  } else {
-    await sb.from("cozinha_cardapio").upsert({
+  // Estratégia: delete todas as linhas do slot, depois insert uma linha por prato
+  await sb.from("cozinha_cardapio").delete()
+    .eq("day_index", dayIdx).eq("meal_index", mealIdx);
+
+  if(names && names.length > 0){
+    const rows = names.map(name=>({
       day_index: dayIdx,
       meal_index: mealIdx,
       recipe_id: null,
-      recipe_name: names[0], // legado
-      recipe_names: names    // novo
-    }, {onConflict: "day_index,meal_index"});
+      recipe_name: null,
+      recipe_names: [name]  // uma linha por prato, com array de 1 elemento
+    }));
+    await sb.from("cozinha_cardapio").insert(rows);
   }
 }
 
