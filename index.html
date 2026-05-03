@@ -1047,6 +1047,7 @@ function buildUnifiedList(){
   }
 
   // 3. Ingredientes faltando para as receitas do cardápio
+  // Compara presença (qty > 0) — não quantidade exata, pois unidades podem diferir
   for(let i=0;i<7;i++){
     for(let m=0;m<4;m++){
       const recipeName = week[i][m];
@@ -1055,11 +1056,15 @@ function buildUnifiedList(){
       if(!recipe) continue;
       for(const ing of recipe.ingredients){
         const inP = findInPantry(ing.name);
-        const have = inP ? inP.qty : 0;
-        const missing = Math.max(0, ing.qty - have);
-        if(missing > 0){
-          const inPCategory = inP ? inP.category : "Outros";
-          add(ing.name, missing, ing.unit, inPCategory, "Semana");
+        const temNaDespensa = inP && inP.qty > 0;
+        if(!temNaDespensa){
+          // Não tem na despensa — adiciona à lista com tag Semana
+          const category = inP ? inP.category : "Outros";
+          add(ing.name, ing.qty, ing.unit, category, "Semana");
+        }
+        // Se tem mas está baixo (qty <= 1), já foi pego na etapa 2 — adiciona só a tag Semana
+        if(inP && inP.qty > 0 && inP.qty <= 1){
+          add(ing.name, inP.qty, inP.unit, inP.category, "Semana");
         }
       }
     }
