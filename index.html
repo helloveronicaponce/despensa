@@ -618,13 +618,26 @@ async function clearCardapioDB(){
     .delete().gte("day_index", 0);
 }
 
-async function loadFromDB(){
-  await Promise.all([loadDespensa(), loadCardapio()]);
-  dbReady = true;
-  renderAll();
+
+
+async function loadReceitas(){
+  const {data, error} = await sb
+    .from("cozinha_receitas")
+    .select("id, name, time_min, serves, meal_type, ingredients, steps")
+    .order("name");
+  if(error){ console.warn("Erro ao carregar receitas:", error); return; }
+  if(data && data.length > 0){
+    recipes = data.map(r=>({
+      id: r.id,
+      name: r.name,
+      time: r.time_min,
+      serves: r.serves,
+      mealType: r.meal_type,
+      ingredients: r.ingredients,
+      steps: r.steps
+    }));
+  }
 }
-
-
 
 // ── DESPENSA ─────────────────────────────────────────────────
 
@@ -692,7 +705,7 @@ async function clearCardapioDB(){
 // ── BOOT ─────────────────────────────────────────────────────
 
 async function loadFromDB(){
-  await Promise.all([loadDespensa(), loadCardapio()]);
+  await Promise.all([loadReceitas(), loadDespensa(), loadCardapio()]);
   dbReady = true;
   renderAll();
 }
@@ -716,38 +729,7 @@ const STANDARD=[
 
 let pantry = []; // carregado do Supabase no boot
 
-const recipes=[
-  {id:1,name:"Arroz com Feijão",time:"40 min",serves:4,ingredients:[{name:"Arroz",qty:0.3,unit:"kg"},{name:"Feijão",qty:0.3,unit:"kg"},{name:"Cebola",qty:1,unit:"un"},{name:"Alho",qty:3,unit:"dente"},{name:"Óleo",qty:0.05,unit:"L"},{name:"Sal",qty:0.01,unit:"pct"}],steps:["Deixe o feijão de molho na água por 1 hora","Cozinhe o feijão na panela de pressão por 30 min","Em outra panela, refogue alho e cebola no óleo","Adicione o arroz, mexa, cubra com água quente e sal","Tampe e cozinhe em fogo baixo por 18 min","Tempere o feijão cozido com alho refogado e sal"]},
-  {id:2,name:"Omelete Simples",time:"10 min",serves:2,ingredients:[{name:"Ovos",qty:0.3,unit:"cx"},{name:"Sal",qty:0.005,unit:"pct"},{name:"Manteiga",qty:0.2,unit:"un"},{name:"Queijo mussarela",qty:0.05,unit:"kg"}],steps:["Bata os ovos com sal","Aqueça a frigideira com manteiga","Despeje os ovos batidos","Quando começar a firmar, adicione queijo no centro","Dobre ao meio e sirva"]},
-  {id:3,name:"Macarrão à Bolonhesa",time:"35 min",serves:4,ingredients:[{name:"Macarrão",qty:1,unit:"pct"},{name:"Carne moída",qty:0.4,unit:"kg"},{name:"Tomate",qty:4,unit:"un"},{name:"Cebola",qty:1,unit:"un"},{name:"Alho",qty:3,unit:"dente"},{name:"Sal",qty:0.01,unit:"pct"},{name:"Óleo",qty:0.05,unit:"L"}],steps:["Cozinhe o macarrão em água com sal por 8 min","Refogue alho e cebola no óleo","Adicione a carne moída e doure","Acrescente os tomates picados","Tempere com sal e cozinhe por 15 min","Sirva o molho sobre o macarrão"]},
-  {id:4,name:"Frango Grelhado",time:"25 min",serves:3,ingredients:[{name:"Frango (peito)",qty:0.6,unit:"kg"},{name:"Limão",qty:1,unit:"un"},{name:"Alho",qty:2,unit:"dente"},{name:"Sal",qty:0.005,unit:"pct"},{name:"Óleo",qty:0.03,unit:"L"}],steps:["Tempere o frango com limão, alho amassado e sal","Deixe marinar por 15 min","Aqueça a frigideira com fio de óleo","Grelhe os filés de cada lado por 5 min","Sirva com salada ou arroz"]},
-  {id:5,name:"Panqueca de Banana",time:"15 min",serves:2,ingredients:[{name:"Banana",qty:2,unit:"un"},{name:"Ovos",qty:0.2,unit:"cx"},{name:"Farinha de trigo",qty:0.1,unit:"kg"},{name:"Leite",qty:0.2,unit:"L"},{name:"Açúcar",qty:0.02,unit:"kg"},{name:"Manteiga",qty:0.1,unit:"un"}],steps:["Amasse as bananas com garfo","Bata com ovos, leite, farinha e açúcar","Aqueça frigideira com manteiga","Coloque conchas de massa e doure dos dois lados","Sirva com mel ou açúcar e canela"]},
-  {id:6,name:"Sopa de Legumes",time:"30 min",serves:4,ingredients:[{name:"Batata",qty:0.5,unit:"kg"},{name:"Cenoura",qty:2,unit:"un"},{name:"Cebola",qty:1,unit:"un"},{name:"Alho",qty:2,unit:"dente"},{name:"Sal",qty:0.005,unit:"pct"},{name:"Óleo",qty:0.03,unit:"L"}],steps:["Refogue alho e cebola no óleo","Adicione batata e cenoura picadas","Cubra com água e cozinhe por 20 min","Tempere com sal","Bata parte no liquidificador para engrossar","Volte à panela e sirva"]},
-  {id:7,name:"Salada de Tomate",time:"5 min",serves:2,ingredients:[{name:"Tomate",qty:3,unit:"un"},{name:"Cebola",qty:0.5,unit:"un"},{name:"Sal",qty:0.005,unit:"pct"},{name:"Óleo",qty:0.02,unit:"L"},{name:"Vinagre",qty:0.01,unit:"L"}],steps:["Pique os tomates em rodelas","Fatie a cebola fina","Misture em uma travessa","Tempere com sal, óleo e vinagre","Sirva fresca"]},
-  {id:8,name:"Bolo de Banana",time:"50 min",serves:8,ingredients:[{name:"Banana",qty:4,unit:"un"},{name:"Farinha de trigo",qty:0.3,unit:"kg"},{name:"Açúcar",qty:0.2,unit:"kg"},{name:"Ovos",qty:0.3,unit:"cx"},{name:"Leite",qty:0.2,unit:"L"},{name:"Manteiga",qty:0.5,unit:"un"}],steps:["Pré-aqueça o forno a 180°C","Bata banana, ovos, leite, açúcar e manteiga no liquidificador","Misture com farinha","Despeje em forma untada","Asse por 35-40 min até dourar"]},
-  {id:9,name:"Strogonoff de Frango",time:"30 min",serves:4,ingredients:[{name:"Frango (peito)",qty:0.6,unit:"kg"},{name:"Cebola",qty:1,unit:"un"},{name:"Alho",qty:3,unit:"dente"},{name:"Tomate",qty:2,unit:"un"},{name:"Requeijão",qty:1,unit:"un"},{name:"Sal",qty:0.005,unit:"pct"},{name:"Óleo",qty:0.03,unit:"L"}],steps:["Corte o frango em cubos e tempere","Refogue alho e cebola","Doure o frango","Acrescente tomates picados e cozinhe 10 min","Adicione o requeijão e mexa","Sirva com arroz"]},
-  {id:10,name:"Arroz à Grega",time:"30 min",serves:4,ingredients:[{name:"Arroz",qty:0.3,unit:"kg"},{name:"Cenoura",qty:1,unit:"un"},{name:"Cebola",qty:1,unit:"un"},{name:"Alho",qty:2,unit:"dente"},{name:"Sal",qty:0.005,unit:"pct"},{name:"Óleo",qty:0.03,unit:"L"}],steps:["Refogue alho e cebola","Adicione cenoura picadinha","Acrescente arroz e refogue","Cubra com água quente e sal","Cozinhe em fogo baixo por 18 min"]},
-  {id:11,name:"Feijoada Light",time:"60 min",serves:6,ingredients:[{name:"Feijão",qty:0.5,unit:"kg"},{name:"Carne moída",qty:0.3,unit:"kg"},{name:"Cebola",qty:1,unit:"un"},{name:"Alho",qty:4,unit:"dente"},{name:"Sal",qty:0.01,unit:"pct"},{name:"Óleo",qty:0.03,unit:"L"}],steps:["Cozinhe o feijão na pressão por 35 min","Refogue alho e cebola separadamente","Doure a carne","Misture tudo no feijão","Cozinhe mais 15 min","Sirva com arroz"]},
-  {id:12,name:"Sanduíche Quente",time:"10 min",serves:1,ingredients:[{name:"Pão de forma",qty:0.2,unit:"pct"},{name:"Queijo mussarela",qty:0.05,unit:"kg"},{name:"Tomate",qty:0.5,unit:"un"},{name:"Manteiga",qty:0.1,unit:"un"}],steps:["Passe manteiga no pão","Recheie com queijo e tomate","Aqueça em frigideira ou sanduicheira","Doure dos dois lados","Sirva imediatamente"]},
-  {id:13,name:"Vitamina de Banana",time:"5 min",serves:1,ingredients:[{name:"Banana",qty:1,unit:"un"},{name:"Leite",qty:0.25,unit:"L"},{name:"Açúcar",qty:0.01,unit:"kg"}],steps:["Coloque tudo no liquidificador","Bata por 30 segundos","Sirva gelado"]},
-  {id:14,name:"Batata Frita Caseira",time:"20 min",serves:3,ingredients:[{name:"Batata",qty:0.8,unit:"kg"},{name:"Óleo",qty:0.3,unit:"L"},{name:"Sal",qty:0.005,unit:"pct"}],steps:["Descasque e corte as batatas em palitos","Lave bem em água fria","Seque com pano","Frite em óleo quente até dourar","Escorra e tempere com sal"]},
-  {id:15,name:"Risoto de Frango",time:"35 min",serves:4,ingredients:[{name:"Arroz",qty:0.3,unit:"kg"},{name:"Frango (peito)",qty:0.4,unit:"kg"},{name:"Cebola",qty:1,unit:"un"},{name:"Alho",qty:2,unit:"dente"},{name:"Manteiga",qty:0.5,unit:"un"},{name:"Sal",qty:0.005,unit:"pct"}],steps:["Doure cubos de frango com alho","Refogue cebola","Adicione arroz e mexa","Vá adicionando água quente aos poucos","Mexa sempre, por 18 min","Finalize com manteiga"]},
-  {id:16,name:"Cuca de Banana",time:"60 min",serves:8,ingredients:[{name:"Banana",qty:4,unit:"un"},{name:"Farinha de trigo",qty:0.4,unit:"kg"},{name:"Açúcar",qty:0.25,unit:"kg"},{name:"Manteiga",qty:0.5,unit:"un"},{name:"Ovos",qty:0.3,unit:"cx"},{name:"Leite",qty:0.2,unit:"L"}],steps:["Misture massa: farinha, ovos, açúcar, leite, manteiga","Despeje em forma","Disponha as bananas em fatias por cima","Cubra com farofa de açúcar e canela","Asse 40 min a 180°C"]},
-  {id:17,name:"Frango com Quiabo",time:"45 min",serves:4,ingredients:[{name:"Frango (peito)",qty:0.6,unit:"kg"},{name:"Tomate",qty:3,unit:"un"},{name:"Cebola",qty:1,unit:"un"},{name:"Alho",qty:3,unit:"dente"},{name:"Sal",qty:0.005,unit:"pct"},{name:"Óleo",qty:0.05,unit:"L"}],steps:["Tempere e doure o frango","Refogue alho e cebola","Adicione tomate","Junte ao frango com água","Cozinhe 25 min","Sirva com arroz e angu"]},
-  {id:18,name:"Pão de Queijo",time:"45 min",serves:6,ingredients:[{name:"Farinha de trigo",qty:0.3,unit:"kg"},{name:"Queijo mussarela",qty:0.2,unit:"kg"},{name:"Ovos",qty:0.2,unit:"cx"},{name:"Leite",qty:0.2,unit:"L"},{name:"Óleo",qty:0.1,unit:"L"},{name:"Sal",qty:0.003,unit:"pct"}],steps:["Ferva leite, óleo e sal","Despeje sobre a farinha","Misture e deixe esfriar","Adicione ovos e queijo","Faça bolinhas","Asse 25 min a 180°C"]},
-  {id:19,name:"Carne Moída Refogada",time:"20 min",serves:4,ingredients:[{name:"Carne moída",qty:0.5,unit:"kg"},{name:"Tomate",qty:2,unit:"un"},{name:"Cebola",qty:1,unit:"un"},{name:"Alho",qty:3,unit:"dente"},{name:"Sal",qty:0.005,unit:"pct"},{name:"Óleo",qty:0.03,unit:"L"}],steps:["Refogue alho e cebola no óleo","Adicione a carne e doure","Acrescente tomate picado","Tempere com sal","Cozinhe por 10 min","Sirva com arroz"]},
-  {id:20,name:"Salada de Frango",time:"20 min",serves:3,ingredients:[{name:"Frango (peito)",qty:0.4,unit:"kg"},{name:"Cenoura",qty:1,unit:"un"},{name:"Cebola",qty:0.5,unit:"un"},{name:"Limão",qty:1,unit:"un"},{name:"Sal",qty:0.005,unit:"pct"},{name:"Óleo",qty:0.02,unit:"L"}],steps:["Cozinhe o frango em água com sal","Desfie quando estiver morno","Misture com cenoura ralada e cebola fina","Tempere com limão, óleo e sal"]},
-  {id:21,name:"Arroz de Forno",time:"40 min",serves:6,ingredients:[{name:"Arroz",qty:0.4,unit:"kg"},{name:"Frango (peito)",qty:0.3,unit:"kg"},{name:"Queijo mussarela",qty:0.15,unit:"kg"},{name:"Requeijão",qty:1,unit:"un"},{name:"Cebola",qty:1,unit:"un"},{name:"Sal",qty:0.005,unit:"pct"}],steps:["Cozinhe arroz","Desfie frango cozido","Misture arroz, frango, requeijão e cebola","Coloque em forma untada","Cubra com queijo","Asse 20 min até gratinar"]},
-  {id:22,name:"Macarrão Alho e Óleo",time:"15 min",serves:3,ingredients:[{name:"Macarrão",qty:1,unit:"pct"},{name:"Alho",qty:6,unit:"dente"},{name:"Óleo",qty:0.05,unit:"L"},{name:"Sal",qty:0.005,unit:"pct"}],steps:["Cozinhe o macarrão","Doure muito alho fatiado no óleo","Misture o macarrão escorrido","Tempere com sal","Sirva imediatamente"]},
-  {id:23,name:"Empadão de Frango",time:"75 min",serves:8,ingredients:[{name:"Farinha de trigo",qty:0.5,unit:"kg"},{name:"Manteiga",qty:1,unit:"un"},{name:"Frango (peito)",qty:0.5,unit:"kg"},{name:"Tomate",qty:2,unit:"un"},{name:"Cebola",qty:1,unit:"un"},{name:"Ovos",qty:0.2,unit:"cx"},{name:"Sal",qty:0.01,unit:"pct"}],steps:["Faça massa com farinha, manteiga, ovo e sal","Refogue frango desfiado com cebola e tomate","Forre forma com massa","Recheie e cubra","Pincele com gema","Asse 40 min a 180°C"]},
-  {id:24,name:"Suco de Limão",time:"5 min",serves:4,ingredients:[{name:"Limão",qty:3,unit:"un"},{name:"Açúcar",qty:0.05,unit:"kg"}],steps:["Esprema os limões","Adicione 1 litro de água gelada","Açúcar a gosto","Misture e sirva com gelo"]},
-  {id:25,name:"Purê de Batata",time:"25 min",serves:4,ingredients:[{name:"Batata",qty:0.8,unit:"kg"},{name:"Leite",qty:0.2,unit:"L"},{name:"Manteiga",qty:0.5,unit:"un"},{name:"Sal",qty:0.005,unit:"pct"}],steps:["Cozinhe batatas em água com sal","Escorra e amasse ainda quentes","Adicione leite morno e manteiga","Misture até cremoso","Sirva quente"]},
-  {id:26,name:"Mexido de Frango",time:"30 min",serves:4,ingredients:[{name:"Arroz",qty:0.3,unit:"kg"},{name:"Frango (peito)",qty:0.3,unit:"kg"},{name:"Feijão",qty:0.2,unit:"kg"},{name:"Cebola",qty:1,unit:"un"},{name:"Alho",qty:3,unit:"dente"},{name:"Ovos",qty:0.2,unit:"cx"}],steps:["Refogue alho e cebola","Adicione frango desfiado","Junte arroz e feijão cozidos","Misture bem","Faça ovos mexidos por cima","Sirva quente"]},
-  {id:27,name:"Quiche de Queijo",time:"50 min",serves:6,ingredients:[{name:"Farinha de trigo",qty:0.25,unit:"kg"},{name:"Manteiga",qty:0.7,unit:"un"},{name:"Ovos",qty:0.4,unit:"cx"},{name:"Leite",qty:0.2,unit:"L"},{name:"Queijo mussarela",qty:0.2,unit:"kg"},{name:"Sal",qty:0.005,unit:"pct"}],steps:["Faça massa com farinha, manteiga e 1 ovo","Forre forma","Bata ovos com leite e sal","Adicione queijo ralado","Despeje sobre a massa","Asse 35 min a 180°C"]},
-  {id:28,name:"Brigadeiro de Panela",time:"15 min",serves:4,ingredients:[{name:"Leite",qty:0.4,unit:"L"},{name:"Açúcar",qty:0.2,unit:"kg"},{name:"Manteiga",qty:0.3,unit:"un"}],steps:["Misture tudo na panela","Cozinhe em fogo médio mexendo sempre","Quando desgrudar do fundo, está pronto","Sirva quente em taças"]},
-  {id:29,name:"Frango Xadrez",time:"25 min",serves:4,ingredients:[{name:"Frango (peito)",qty:0.5,unit:"kg"},{name:"Cenoura",qty:1,unit:"un"},{name:"Cebola",qty:1,unit:"un"},{name:"Alho",qty:3,unit:"dente"},{name:"Tomate",qty:2,unit:"un"},{name:"Óleo",qty:0.04,unit:"L"},{name:"Sal",qty:0.005,unit:"pct"}],steps:["Corte frango em cubos","Doure no óleo","Refogue cebola, alho e cenoura em cubinhos","Junte tudo, adicione tomate","Cozinhe 10 min","Sirva com arroz branco"]},
-  {id:30,name:"Pão na Chapa",time:"8 min",serves:1,ingredients:[{name:"Pão de forma",qty:0.15,unit:"pct"},{name:"Manteiga",qty:0.15,unit:"un"}],steps:["Aqueça frigideira","Passe manteiga generosa no pão","Doure dos dois lados em fogo médio","Sirva imediatamente"]}
-];
+let recipes = []; // carregado do Supabase no boot
 
 // Heurística de classificação por refeição
 const MAIN_KEYWORDS=["arroz","feijão","macarrão","frango","carne","sopa","risoto","feijoada","empadão","strogonoff","frango xadrez","mexido","frango com","salada de frango","arroz de forno","batata frita","purê","quiche"];
