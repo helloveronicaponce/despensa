@@ -1166,17 +1166,51 @@ function renderList(){
     countColor:"var(--black)"
   });
 
-  // Bloco 2 — Receitas da semana (enriquece com categoria da despensa)
-  renderBlock({
-    title:"Para as receitas da semana",
-    sub:"O que falta para fazer o que você planejou.",
-    items:recipeList.map(item=>{
+  // Bloco 2 — Receitas da semana (lista única, sem categorias)
+  {
+    const section=document.createElement("div");
+    section.className="list-section";
+    const enriched=recipeList.map(item=>{
       const inP=findInPantry(item.name);
       return {...item, category:inP?inP.category:"Outros"};
-    }),
-    isPriority:false,
-    countColor:null
-  });
+    });
+    const head=document.createElement("div");
+    head.className="list-section-head";
+    head.innerHTML=`
+      <div>
+        <div class="list-section-title">Para as receitas da semana</div>
+        <div class="list-section-sub">O que falta para fazer o que você planejou.</div>
+      </div>
+      <div class="list-section-count">${enriched.length}</div>
+    `;
+    section.appendChild(head);
+    if(enriched.length===0){
+      const empty=document.createElement("div");
+      empty.className="italic";
+      empty.style.cssText="color:var(--black-60);padding:16px 0";
+      empty.textContent=week.flat().filter(x=>x).length===0
+        ?"Adicione refeições ao cardápio para gerar a lista."
+        :"Você já tem tudo. Pode cozinhar.";
+      section.appendChild(empty);
+    } else {
+      const list=document.createElement("div");
+      list.style.cssText="display:flex;flex-direction:column";
+      for(const item of enriched){
+        const key="rec-"+item.name;
+        const row=document.createElement("div");
+        row.className="list-item"+(checkedItems.has(key)?" checked":"");
+        row.dataset.key=key;
+        row.innerHTML=`
+          <div class="list-checkbox"></div>
+          <div class="list-item-name">${item.name}</div>
+          <div class="list-item-qty">${fmtQty(item.qty)} ${item.unit}</div>
+        `;
+        list.appendChild(row);
+      }
+      section.appendChild(list);
+    }
+    root.appendChild(section);
+  }
 
   document.getElementById("count-list").textContent=recipeList.length+priorityList.length;
 }
