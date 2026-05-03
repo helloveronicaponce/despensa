@@ -833,7 +833,9 @@ async function loadReceitas(){
       serves: r.serves,
       mealType: r.meal_type,
       category: r.category || 'Outros',
-      ingredients: Array.isArray(r.ingredients) ? r.ingredients : [],
+      ingredients: Array.isArray(r.ingredients)
+        ? r.ingredients.filter(i => i && i.name)
+        : [],
       steps: Array.isArray(r.steps) ? r.steps : []
     }));
   }
@@ -848,12 +850,14 @@ async function loadDespensa(){
     .order("category").order("name");
   if(error){ console.warn("Erro ao carregar despensa:", error); return; }
   if(data && data.length > 0){
-    pantry = data.map(r=>({
-      name: r.name,
-      qty: parseFloat(r.qty),
-      unit: r.unit,
-      category: r.category
-    }));
+    pantry = data
+      .filter(r => r.name) // ignora registros sem nome
+      .map(r=>({
+        name: r.name,
+        qty: parseFloat(r.qty) || 0,
+        unit: r.unit || 'un',
+        category: r.category || 'Outros'
+      }));
   }
 }
 
@@ -961,7 +965,10 @@ let recipeSearchQ="";
 let modalRecipeId=null;
 const checkedItems=new Set();
 
-function findInPantry(name){return pantry.find(p=>p.name.toLowerCase()===name.toLowerCase());}
+function findInPantry(name){
+  if(!name) return null;
+  return pantry.find(p=>p.name && p.name.toLowerCase()===name.toLowerCase());
+}
 function isLowStock(item){return item.qty<=1;}
 function fmtQty(q){return q.toFixed(q%1===0?0:1).replace(".",",");}
 
