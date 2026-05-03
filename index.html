@@ -819,7 +819,12 @@ async function loadReceitas(){
     .from("cozinha_receitas")
     .select("id, name, time_min, serves, meal_type, category, ingredients, steps")
     .order("name");
-  if(error){ console.warn("Erro ao carregar receitas:", error); return; }
+  if(error){
+    console.error("Erro loadReceitas:", error);
+    showToast("Erro receitas: "+error.message);
+    return;
+  }
+  console.log("loadReceitas: "+( data ? data.length : 0)+" registros");
   if(data && data.length > 0){
     recipes = data.map(r=>({
       id: r.id,
@@ -828,8 +833,8 @@ async function loadReceitas(){
       serves: r.serves,
       mealType: r.meal_type,
       category: r.category || 'Outros',
-      ingredients: r.ingredients,
-      steps: r.steps
+      ingredients: Array.isArray(r.ingredients) ? r.ingredients : [],
+      steps: Array.isArray(r.steps) ? r.steps : []
     }));
   }
 }
@@ -899,9 +904,19 @@ async function clearCardapioDB(){
 // ── BOOT ─────────────────────────────────────────────────────
 
 async function loadFromDB(){
-  await Promise.allSettled([loadReceitas(), loadDespensa(), loadCardapio()]);
-  dbReady = true;
-  renderAll();
+  try {
+    await Promise.allSettled([loadReceitas(), loadDespensa(), loadCardapio()]);
+    dbReady = true;
+    renderAll();
+    // Diagnóstico rápido — remove depois de confirmar
+    if(recipes.length === 0){
+      showToast("⚠️ Receitas não carregaram. Verifique o console.");
+      console.error("Receitas vazias após loadReceitas");
+    }
+  } catch(e){
+    console.error("Erro no loadFromDB:", e);
+    showToast("Erro ao carregar dados: "+e.message);
+  }
 }
 const UNITS=["un","kg","g","L","ml","cx","pct","dente","fatia"];
 const CATEGORIES=["Hortifrúti","Proteínas","Laticínios","Grãos","Bebidas","Higiene","Limpeza","Outros"];
