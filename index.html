@@ -259,6 +259,14 @@ html,body{
   font-family:var(--font-display);font-weight:900;
   font-size:13px;letter-spacing:-0.01em;line-height:1.2;
   flex:1;
+  text-decoration:underline;
+  text-decoration-color:transparent;
+  text-underline-offset:2px;
+  transition:text-decoration-color var(--dur),color var(--dur);
+}
+.meal-card-recipe:hover{
+  text-decoration-color:var(--black);
+  color:var(--black);
 }
 .meal-card-info{
   font-family:var(--font-italic);font-style:italic;
@@ -926,12 +934,13 @@ function renderWeek(){
 
       if(recipeName){
         total++;
+        card.dataset.recipeName=recipeName;
         card.innerHTML=`
           <div class="meal-card-label">
             <span class="meal-card-label-emoji">${MEAL_EMOJI[m]}</span>
             ${REFEICOES_LABEL[REFEICOES[m]]}
           </div>
-          <div class="meal-card-recipe">${recipeName}</div>
+          <div class="meal-card-recipe" data-action="view" style="cursor:pointer" title="Ver receita">${recipeName}</div>
           <div class="meal-card-actions">
             <button class="meal-card-btn" data-action="change" data-day="${i}" data-meal="${m}">Trocar</button>
             <button class="meal-card-btn is-remove" data-action="clear" data-day="${i}" data-meal="${m}">✕</button>
@@ -1218,7 +1227,27 @@ function renderList(){
 function openModal(recipeId){
   const r=recipes.find(x=>x.id===recipeId);
   if(!r) return;
-  modalRecipeId=recipeId;
+  _openModalWith(r);
+}
+
+function openModalByName(name){
+  const r=recipes.find(x=>x.name.toLowerCase()===name.toLowerCase());
+  if(!r){
+    // Texto livre sem receita cadastrada — mostra só o nome
+    document.getElementById("modal-status").className="recipe-status missing";
+    document.getElementById("modal-status").textContent="Texto livre";
+    document.getElementById("modal-title").textContent=name;
+    document.getElementById("modal-meta").textContent="Receita não cadastrada no app";
+    document.getElementById("modal-ingredients").innerHTML=`<li style="padding:12px;color:var(--black-60);font-style:italic">Nenhum ingrediente cadastrado para este prato.</li>`;
+    document.getElementById("modal-steps").innerHTML=`<li style="padding:12px;color:var(--black-60);font-style:italic">Modo de preparo não disponível.</li>`;
+    document.getElementById("recipe-modal").classList.add("open");
+    return;
+  }
+  _openModalWith(r);
+}
+
+function _openModalWith(r){
+  modalRecipeId=r.name; // usa nome como referência
   const status=recipeStatus(r);
   document.getElementById("modal-title").textContent=r.name;
   document.getElementById("modal-meta").textContent=`${r.time} · ${r.serves} porções`;
@@ -1258,12 +1287,12 @@ document.getElementById("recipe-modal").addEventListener("click",(e)=>{
 });
 document.getElementById("add-week-btn").addEventListener("click",()=>{
   if(!modalRecipeId) return;
-  // procura o primeiro slot vazio percorrendo dia por dia, refeição por refeição
   let found=false;
   outer: for(let i=0;i<7;i++){
     for(let m=0;m<REFEICOES.length;m++){
       if(!week[i][m]){
         week[i][m]=modalRecipeId;
+        if(dbReady) saveCardapioSlot(i,m,modalRecipeId);
         found=true;
         break outer;
       }
@@ -1393,6 +1422,12 @@ document.getElementById("menu-week").addEventListener("click",e=>{
     }
     if(btn.dataset.action==="change"){
       openPickerAt(day,meal);
+      return;
+    }
+    if(btn.dataset.action==="view"){
+      const card=btn.closest(".meal-card");
+      const name=card?card.dataset.recipeName:null;
+      if(name) openModalByName(name);
       return;
     }
   }
