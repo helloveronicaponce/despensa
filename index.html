@@ -106,11 +106,11 @@ html,body{
 .pantry-row.is-low{background:#fff5e6}
 .pantry-row.is-low:hover{background:#ffeed0}
 
-/* Nome + tags */
-.row-name-wrap{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
-.row-name{font-family:var(--font-body);font-weight:700;font-size:14px;letter-spacing:-0.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
-.row-tags{display:flex;gap:4px;flex-wrap:wrap}
-.tag{padding:2px 7px;border-radius:var(--r-pill);font-size:8px;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;line-height:1.5}
+/* Nome + tags — mesma linha */
+.row-name-wrap{flex:1;min-width:0;display:flex;flex-direction:row;align-items:center;gap:6px;overflow:hidden}
+.row-name{font-family:var(--font-body);font-weight:700;font-size:14px;letter-spacing:-0.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;flex-shrink:1}
+.row-tags{display:flex;gap:4px;flex-shrink:0}
+.tag{padding:2px 7px;border-radius:var(--r-pill);font-size:8px;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;line-height:1.5;white-space:nowrap}
 .tag.essential{background:var(--lime);color:var(--black)}
 .tag.low{background:var(--pink);color:var(--off-white)}
 .tag.zero{background:var(--black);color:var(--off-white)}
@@ -135,7 +135,31 @@ html,body{
 .icon-btn{width:28px;height:28px;border:0;background:transparent;color:var(--black-60);cursor:pointer;display:grid;place-items:center;border-radius:var(--r-sm);transition:background var(--dur),color var(--dur);font-size:13px;flex-shrink:0}
 .icon-btn:hover{background:var(--black);color:var(--off-white)}
 
-/* RECEITAS */
+/* MODAL DE EDIÇÃO DE RECEITA */
+.edit-overlay{position:fixed;inset:0;background:rgba(15,15,15,0.6);display:none;align-items:center;justify-content:center;padding:24px;z-index:70}
+.edit-overlay.open{display:flex;animation:fadeIn 150ms var(--ease)}
+.edit-modal{background:var(--off-white);border-radius:var(--r-lg);width:100%;max-width:680px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(15,15,15,0.2);overflow:hidden}
+.edit-modal-header{padding:24px 28px 20px;border-bottom:1.5px solid var(--rule);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.edit-modal-title{font-family:var(--font-display);font-weight:900;font-size:24px;letter-spacing:-0.02em}
+.edit-modal-body{overflow-y:auto;flex:1;padding:24px 28px;display:flex;flex-direction:column;gap:20px}
+.edit-modal-footer{padding:16px 28px;border-top:1.5px solid var(--rule);flex-shrink:0;display:flex;gap:10px;justify-content:flex-end}
+
+.edit-field{display:flex;flex-direction:column;gap:6px}
+.edit-label{font-family:var(--font-body);font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--black-60)}
+.edit-input{padding:11px 14px;border:1.5px solid var(--rule);border-radius:var(--r-sm);background:var(--off-white);font-family:var(--font-body);font-size:14px;outline:none;transition:border-color var(--dur)}
+.edit-input:focus{border-color:var(--black)}
+.edit-select{padding:11px 14px;border:1.5px solid var(--rule);border-radius:var(--r-sm);background:var(--off-white);font-family:var(--font-body);font-size:14px;outline:none;cursor:pointer}
+.edit-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.edit-textarea{padding:11px 14px;border:1.5px solid var(--rule);border-radius:var(--r-sm);background:var(--off-white);font-family:var(--font-body);font-size:14px;outline:none;resize:vertical;min-height:100px;transition:border-color var(--dur);line-height:1.5}
+.edit-textarea:focus{border-color:var(--black)}
+
+/* Ingredientes editáveis */
+.ing-list{display:flex;flex-direction:column;gap:8px}
+.ing-row{display:grid;grid-template-columns:1fr 80px 80px 32px;gap:8px;align-items:center}
+.ing-input{padding:8px 10px;border:1.5px solid var(--rule);border-radius:var(--r-sm);font-family:var(--font-body);font-size:13px;outline:none;transition:border-color var(--dur);background:var(--off-white)}
+.ing-input:focus{border-color:var(--black)}
+.ing-remove{width:28px;height:28px;border:0;background:transparent;color:var(--black-60);cursor:pointer;display:grid;place-items:center;border-radius:4px;font-size:14px;transition:background var(--dur),color var(--dur)}
+.ing-remove:hover{background:var(--pink);color:var(--off-white)}
 .recipe-toolbar{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;align-items:center}
 .recipe-search{flex:1;min-width:260px;padding:12px 16px;border:1.5px solid var(--black);border-radius:var(--r-pill);background:var(--off-white);font-family:var(--font-body);font-size:14px;outline:none;transition:box-shadow var(--dur)}
 .recipe-search:focus{box-shadow:var(--shadow-2)}
@@ -570,6 +594,56 @@ html,body{
 <!-- Elemento off-screen para render do PNG -->
 <div id="png-target"></div>
 
+<!-- Modal de edição de receita -->
+<div class="edit-overlay" id="edit-overlay">
+  <div class="edit-modal">
+    <div class="edit-modal-header">
+      <div class="edit-modal-title">Editar receita</div>
+      <button class="modal-close" id="edit-close">✕</button>
+    </div>
+    <div class="edit-modal-body">
+      <div class="edit-row">
+        <div class="edit-field" style="grid-column:span 3">
+          <label class="edit-label">Nome da receita</label>
+          <input class="edit-input" id="edit-name" type="text" />
+        </div>
+      </div>
+      <div class="edit-row">
+        <div class="edit-field">
+          <label class="edit-label">Tempo</label>
+          <input class="edit-input" id="edit-time" type="text" placeholder="ex: 30 min" />
+        </div>
+        <div class="edit-field">
+          <label class="edit-label">Porções</label>
+          <input class="edit-input" id="edit-serves" type="number" min="1" />
+        </div>
+        <div class="edit-field">
+          <label class="edit-label">Tipo</label>
+          <select class="edit-select" id="edit-type">
+            <option value="main">🍽 Refeição</option>
+            <option value="snack">☕ Café & Lanche</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="edit-field">
+        <label class="edit-label">Ingredientes</label>
+        <div class="ing-list" id="edit-ingredients"></div>
+        <button class="btn is-ghost is-sm" id="add-ingredient-btn" style="margin-top:8px;align-self:flex-start">+ Ingrediente</button>
+      </div>
+
+      <div class="edit-field">
+        <label class="edit-label">Modo de preparo <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--black-60)">(um passo por linha)</span></label>
+        <textarea class="edit-textarea" id="edit-steps" rows="6"></textarea>
+      </div>
+    </div>
+    <div class="edit-modal-footer">
+      <button class="btn is-ghost is-sm" id="edit-cancel">Cancelar</button>
+      <button class="btn is-lime is-sm" id="edit-save">Salvar receita</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ============================================================
 // SUPABASE — inicialização
@@ -899,6 +973,9 @@ function renderRecipes(){
       <div class="recipe-progress">
         <div class="recipe-progress-bar"><div class="recipe-progress-fill ${r.status}" style="width:${(r.ratio*100).toFixed(0)}%"></div></div>
         <div class="recipe-progress-text">${r.have} de ${r.total} ingredientes na despensa</div>
+      </div>
+      <div style="margin-top:4px">
+        <button class="btn is-ghost is-sm" data-action="edit-recipe" data-recipe-id="${r.id}" style="font-size:10px;padding:6px 14px">✎ Editar receita</button>
       </div>
     `;
     grid.appendChild(card);
@@ -1355,11 +1432,6 @@ document.getElementById("pantry-search").addEventListener("input",e=>{
   renderPantry();
 });
 
-document.getElementById("recipe-grid").addEventListener("click",e=>{
-  const card=e.target.closest(".recipe-card");
-  if(!card) return;
-  openModal(parseInt(card.dataset.recipeId));
-});
 document.getElementById("recipe-search").addEventListener("input",e=>{
   recipeSearchQ=e.target.value;
   renderRecipes();
@@ -1432,8 +1504,130 @@ document.getElementById("list-content").addEventListener("click",e=>{
   item.classList.toggle("checked");
 });
 
+// ============================================================
+// EDIÇÃO DE RECEITA
+// ============================================================
+let editingRecipeId = null;
+
+function openEditModal(recipeId){
+  const r = recipes.find(x=>x.id===recipeId);
+  if(!r) return;
+  editingRecipeId = recipeId;
+
+  document.getElementById("edit-name").value = r.name;
+  document.getElementById("edit-time").value = r.time;
+  document.getElementById("edit-serves").value = r.serves;
+  document.getElementById("edit-type").value = r.mealType||"main";
+
+  // Ingredientes
+  renderEditIngredients(r.ingredients);
+
+  // Passos
+  document.getElementById("edit-steps").value = (r.steps||[]).join("\n");
+
+  document.getElementById("edit-overlay").classList.add("open");
+}
+
+function renderEditIngredients(ingredients){
+  const root = document.getElementById("edit-ingredients");
+  root.innerHTML="";
+  for(const ing of ingredients){
+    root.appendChild(makeIngRow(ing.name, ing.qty, ing.unit));
+  }
+}
+
+function makeIngRow(name="", qty="", unit="un"){
+  const row = document.createElement("div");
+  row.className="ing-row";
+  row.innerHTML=`
+    <input class="ing-input ing-name" type="text" placeholder="Ingrediente" value="${name}" />
+    <input class="ing-input ing-qty" type="number" placeholder="Qtd" step="0.1" min="0" value="${qty}" />
+    <input class="ing-input ing-unit" type="text" placeholder="un" value="${unit}" />
+    <button class="ing-remove" title="Remover">✕</button>
+  `;
+  row.querySelector(".ing-remove").addEventListener("click",()=>row.remove());
+  return row;
+}
+
+function closeEditModal(){
+  document.getElementById("edit-overlay").classList.remove("open");
+  editingRecipeId=null;
+}
+
+async function saveEditedRecipe(){
+  if(!editingRecipeId) return;
+
+  const name = document.getElementById("edit-name").value.trim();
+  const time = document.getElementById("edit-time").value.trim();
+  const serves = parseInt(document.getElementById("edit-serves").value)||1;
+  const mealType = document.getElementById("edit-type").value;
+  const stepsRaw = document.getElementById("edit-steps").value;
+  const steps = stepsRaw.split("\n").map(s=>s.trim()).filter(Boolean);
+
+  // Coleta ingredientes
+  const ingRows = document.querySelectorAll("#edit-ingredients .ing-row");
+  const ingredients = [];
+  ingRows.forEach(row=>{
+    const n = row.querySelector(".ing-name").value.trim();
+    const q = parseFloat(row.querySelector(".ing-qty").value);
+    const u = row.querySelector(".ing-unit").value.trim()||"un";
+    if(n) ingredients.push({name:n, qty:isNaN(q)?0:q, unit:u});
+  });
+
+  if(!name){ alert("Nome obrigatório."); return; }
+
+  const btn = document.getElementById("edit-save");
+  btn.textContent="Salvando…";
+  btn.disabled=true;
+
+  const {error} = await sb.from("cozinha_receitas").update({
+    name, time_min:time, serves, meal_type:mealType, ingredients, steps
+  }).eq("id", editingRecipeId);
+
+  if(error){
+    alert("Erro ao salvar: "+error.message);
+    btn.textContent="Salvar receita";
+    btn.disabled=false;
+    return;
+  }
+
+  // Atualiza localmente
+  const idx = recipes.findIndex(r=>r.id===editingRecipeId);
+  if(idx>=0){
+    recipes[idx] = {...recipes[idx], name, time, serves, mealType, ingredients, steps};
+  }
+
+  closeEditModal();
+  renderAll();
+  showToast("Receita salva ✓");
+  btn.textContent="Salvar receita";
+  btn.disabled=false;
+}
+
+// Event listeners do modal de edição
+document.getElementById("edit-close").addEventListener("click",closeEditModal);
+document.getElementById("edit-cancel").addEventListener("click",closeEditModal);
+document.getElementById("edit-overlay").addEventListener("click",e=>{
+  if(e.target.id==="edit-overlay") closeEditModal();
+});
+document.getElementById("edit-save").addEventListener("click",saveEditedRecipe);
+document.getElementById("add-ingredient-btn").addEventListener("click",()=>{
+  document.getElementById("edit-ingredients").appendChild(makeIngRow());
+});
+
+// Abrir modal ao clicar em "Editar receita" no grid
+document.getElementById("recipe-grid").addEventListener("click",e=>{
+  const editBtn = e.target.closest("[data-action='edit-recipe']");
+  if(editBtn){
+    openEditModal(parseInt(editBtn.dataset.recipeId));
+    return;
+  }
+  const card=e.target.closest(".recipe-card");
+  if(card && !e.target.closest("[data-action]")) openModal(parseInt(card.dataset.recipeId));
+});
+
 document.addEventListener("keydown",e=>{
-  if(e.key==="Escape"){closeModal();closePicker();}
+  if(e.key==="Escape"){closeModal();closePicker();closeEditModal();}
 });
 
 // ============================================================
