@@ -1012,13 +1012,6 @@ function renderWeek(){
     mealsGrid.className="menu-day-meals";
 
     for(let m=0;m<REFEICOES.length;m++){
-      const recipeName=week[i][m]; // agora é string ou null
-      const card=document.createElement("div");
-      card.className="meal-card"+(recipeName?" has-recipe":"");
-      card.dataset.day=i;
-      card.dataset.meal=m;
-
-    for(let m=0;m<REFEICOES.length;m++){
       const names=week[i][m]; // array de strings
       const card=document.createElement("div");
       card.className="meal-card"+(names.length>0?" has-recipe":"");
@@ -1056,7 +1049,6 @@ function renderWeek(){
 
       card.innerHTML=inner;
       mealsGrid.appendChild(card);
-    }
     }
 
     row.appendChild(mealsGrid);
