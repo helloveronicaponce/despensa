@@ -591,13 +591,42 @@ async function loadFromDB(){
   showToast("Cardápio carregado ✓");
 }}
 
-// ── BOOT: carrega tudo do banco ───────────────────────────────
+// ── DESPENSA — localStorage ───────────────────────────────────
+const PANTRY_KEY = "cozinha_despensa_v1";
+
+const PANTRY_DEFAULT = [
+  {name:"Tomate",qty:6,unit:"un",category:"Hortifrúti"},{name:"Cebola",qty:4,unit:"un",category:"Hortifrúti"},
+  {name:"Alho",qty:5,unit:"dente",category:"Hortifrúti"},{name:"Batata",qty:1.5,unit:"kg",category:"Hortifrúti"},
+  {name:"Cenoura",qty:3,unit:"un",category:"Hortifrúti"},{name:"Limão",qty:4,unit:"un",category:"Hortifrúti"},
+  {name:"Banana",qty:6,unit:"un",category:"Hortifrúti"},{name:"Ovos",qty:1,unit:"cx",category:"Proteínas"},
+  {name:"Frango (peito)",qty:0.8,unit:"kg",category:"Proteínas"},{name:"Carne moída",qty:0.5,unit:"kg",category:"Proteínas"},
+  {name:"Leite",qty:2,unit:"L",category:"Laticínios"},{name:"Manteiga",qty:1,unit:"un",category:"Laticínios"},
+  {name:"Queijo mussarela",qty:0.3,unit:"kg",category:"Laticínios"},{name:"Requeijão",qty:1,unit:"un",category:"Laticínios"},
+  {name:"Arroz",qty:2,unit:"kg",category:"Grãos"},{name:"Feijão",qty:1,unit:"kg",category:"Grãos"},
+  {name:"Macarrão",qty:2,unit:"pct",category:"Grãos"},{name:"Farinha de trigo",qty:1,unit:"kg",category:"Grãos"},
+  {name:"Pão de forma",qty:1,unit:"pct",category:"Grãos"},{name:"Café",qty:1,unit:"pct",category:"Bebidas"},
+  {name:"Açúcar",qty:1,unit:"kg",category:"Outros"},{name:"Sal",qty:1,unit:"pct",category:"Outros"},
+  {name:"Óleo",qty:1,unit:"L",category:"Outros"},{name:"Vinagre",qty:1,unit:"L",category:"Outros"},
+  {name:"Papel higiênico",qty:1,unit:"pct",category:"Higiene"},{name:"Detergente",qty:2,unit:"un",category:"Limpeza"},
+  {name:"Sabão em pó",qty:1,unit:"un",category:"Limpeza"}
+];
+
+function loadPantryLocal(){
+  try {
+    const saved = localStorage.getItem(PANTRY_KEY);
+    return saved ? JSON.parse(saved) : PANTRY_DEFAULT;
+  } catch(e) { return PANTRY_DEFAULT; }
+}
+
+function savePantryLocal(){
+  try { localStorage.setItem(PANTRY_KEY, JSON.stringify(pantry)); } catch(e) {}
+}
+
+// ── BOOT ─────────────────────────────────────────────────────
 async function loadFromDB(){
-  showToast("Carregando cardápio…");
   await loadCardapio();
   dbReady = true;
   renderAll();
-  showToast("Cardápio carregado ✓");
 }
 const UNITS=["un","kg","g","L","ml","cx","pct","dente","fatia"];
 const CATEGORIES=["Hortifrúti","Proteínas","Laticínios","Grãos","Bebidas","Higiene","Limpeza","Outros"];
@@ -617,22 +646,7 @@ const STANDARD=[
   {name:"Esponja de cozinha",qty:1,unit:"un",category:"Limpeza"},{name:"Sabonete",qty:1,unit:"un",category:"Higiene"}
 ];
 
-let pantry=[
-  {name:"Tomate",qty:6,unit:"un",category:"Hortifrúti"},{name:"Cebola",qty:4,unit:"un",category:"Hortifrúti"},
-  {name:"Alho",qty:5,unit:"dente",category:"Hortifrúti"},{name:"Batata",qty:1.5,unit:"kg",category:"Hortifrúti"},
-  {name:"Cenoura",qty:3,unit:"un",category:"Hortifrúti"},{name:"Limão",qty:4,unit:"un",category:"Hortifrúti"},
-  {name:"Banana",qty:6,unit:"un",category:"Hortifrúti"},{name:"Ovos",qty:1,unit:"cx",category:"Proteínas"},
-  {name:"Frango (peito)",qty:0.8,unit:"kg",category:"Proteínas"},{name:"Carne moída",qty:0.5,unit:"kg",category:"Proteínas"},
-  {name:"Leite",qty:2,unit:"L",category:"Laticínios"},{name:"Manteiga",qty:1,unit:"un",category:"Laticínios"},
-  {name:"Queijo mussarela",qty:0.3,unit:"kg",category:"Laticínios"},{name:"Requeijão",qty:1,unit:"un",category:"Laticínios"},
-  {name:"Arroz",qty:2,unit:"kg",category:"Grãos"},{name:"Feijão",qty:1,unit:"kg",category:"Grãos"},
-  {name:"Macarrão",qty:2,unit:"pct",category:"Grãos"},{name:"Farinha de trigo",qty:1,unit:"kg",category:"Grãos"},
-  {name:"Pão de forma",qty:1,unit:"pct",category:"Grãos"},{name:"Café",qty:1,unit:"pct",category:"Bebidas"},
-  {name:"Açúcar",qty:1,unit:"kg",category:"Outros"},{name:"Sal",qty:1,unit:"pct",category:"Outros"},
-  {name:"Óleo",qty:1,unit:"L",category:"Outros"},{name:"Vinagre",qty:1,unit:"L",category:"Outros"},
-  {name:"Papel higiênico",qty:1,unit:"pct",category:"Higiene"},{name:"Detergente",qty:2,unit:"un",category:"Limpeza"},
-  {name:"Sabão em pó",qty:1,unit:"un",category:"Limpeza"}
-];
+let pantry = loadPantryLocal();
 
 const recipes=[
   {id:1,name:"Arroz com Feijão",time:"40 min",serves:4,ingredients:[{name:"Arroz",qty:0.3,unit:"kg"},{name:"Feijão",qty:0.3,unit:"kg"},{name:"Cebola",qty:1,unit:"un"},{name:"Alho",qty:3,unit:"dente"},{name:"Óleo",qty:0.05,unit:"L"},{name:"Sal",qty:0.01,unit:"pct"}],steps:["Deixe o feijão de molho na água por 1 hora","Cozinhe o feijão na panela de pressão por 30 min","Em outra panela, refogue alho e cebola no óleo","Adicione o arroz, mexa, cubra com água quente e sal","Tampe e cozinhe em fogo baixo por 18 min","Tempere o feijão cozido com alho refogado e sal"]},
@@ -1201,7 +1215,8 @@ document.getElementById("add-form").addEventListener("submit",e=>{
   if(!name||isNaN(qty)) return;
   const existing=findInPantry(name);
   if(existing){existing.qty+=qty;}
-  else {pantry.push({name,qty,unit,category});}
+  else{pantry.push({name,qty,unit,category});}
+  savePantryLocal();
   e.target.reset();
   document.getElementById("add-name").focus();
   renderAll();
@@ -1235,6 +1250,7 @@ document.getElementById("pantry-list-root").addEventListener("click",e=>{
           pantry=pantry.filter(p=>p!==item);
         }
       }
+      savePantryLocal();
       renderAll();
     };
     input.addEventListener("keydown",e=>{
@@ -1252,6 +1268,7 @@ document.getElementById("pantry-list-root").addEventListener("click",e=>{
     if(item.qty===0 && !PRIORITY.has(item.name)){ pantry=pantry.filter(p=>p!==item); }
   }
   if(action==="del"){ pantry=pantry.filter(p=>p!==item); }
+  savePantryLocal();
   renderAll();
 });
 
