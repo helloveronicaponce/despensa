@@ -524,13 +524,22 @@ html,body{
     </div>
     <div class="recipe-toolbar">
       <input type="text" class="recipe-search" id="recipe-search" placeholder="Buscar receita..." />
-      <div class="filter-pills">
+      <div class="filter-pills" id="recipe-filters">
         <button class="filter-pill active" data-filter="all">Todas</button>
-        <button class="filter-pill" data-filter="main">🍽 Refeições Principais</button>
-        <button class="filter-pill" data-filter="snack">☕ Cafés & Lanches</button>
-        <button class="filter-pill" data-filter="ready">Posso fazer</button>
-        <button class="filter-pill" data-filter="almost">Quase lá</button>
-        <button class="filter-pill" data-filter="missing">Falta muito</button>
+        <button class="filter-pill" data-filter="cat:Frango">🍗 Frango</button>
+        <button class="filter-pill" data-filter="cat:Carnes">🥩 Carnes</button>
+        <button class="filter-pill" data-filter="cat:Peixes">🐟 Peixes</button>
+        <button class="filter-pill" data-filter="cat:Massas">🍝 Massas</button>
+        <button class="filter-pill" data-filter="cat:Arroz & Grãos">🍚 Arroz & Grãos</button>
+        <button class="filter-pill" data-filter="cat:Legumes">🥦 Legumes</button>
+        <button class="filter-pill" data-filter="cat:Saladas">🥗 Saladas</button>
+        <button class="filter-pill" data-filter="cat:Sopas">🍲 Sopas</button>
+        <button class="filter-pill" data-filter="cat:Café da Manhã">☕ Café da Manhã</button>
+        <button class="filter-pill" data-filter="cat:Lanches">🥪 Lanches</button>
+        <button class="filter-pill" data-filter="cat:Doces">🍮 Doces</button>
+        <button class="filter-pill" data-filter="ready">✓ Posso fazer</button>
+        <button class="filter-pill" data-filter="almost">~ Quase lá</button>
+        <button class="filter-pill" data-filter="missing">✕ Falta muito</button>
       </div>
     </div>
     <div class="recipe-grid" id="recipe-grid"></div>
@@ -639,10 +648,20 @@ html,body{
           <input class="edit-input" id="edit-serves" type="number" min="1" />
         </div>
         <div class="edit-field">
-          <label class="edit-label">Tipo</label>
-          <select class="edit-select" id="edit-type">
-            <option value="main">🍽 Refeição</option>
-            <option value="snack">☕ Café & Lanche</option>
+          <label class="edit-label">Categoria</label>
+          <select class="edit-select" id="edit-category">
+            <option value="Frango">🍗 Frango</option>
+            <option value="Carnes">🥩 Carnes</option>
+            <option value="Peixes">🐟 Peixes</option>
+            <option value="Massas">🍝 Massas</option>
+            <option value="Arroz & Grãos">🍚 Arroz & Grãos</option>
+            <option value="Legumes">🥦 Legumes</option>
+            <option value="Saladas">🥗 Saladas</option>
+            <option value="Sopas">🍲 Sopas</option>
+            <option value="Café da Manhã">☕ Café da Manhã</option>
+            <option value="Lanches">🥪 Lanches</option>
+            <option value="Doces">🍮 Doces</option>
+            <option value="Outros">Outros</option>
           </select>
         </div>
       </div>
@@ -725,7 +744,7 @@ async function clearCardapioDB(){
 async function loadReceitas(){
   const {data, error} = await sb
     .from("cozinha_receitas")
-    .select("id, name, time_min, serves, meal_type, ingredients, steps")
+    .select("id, name, time_min, serves, meal_type, category, ingredients, steps")
     .order("name");
   if(error){ console.warn("Erro ao carregar receitas:", error); return; }
   if(data && data.length > 0){
@@ -735,6 +754,7 @@ async function loadReceitas(){
       time: r.time_min,
       serves: r.serves,
       mealType: r.meal_type,
+      category: r.category || 'Outros',
       ingredients: r.ingredients,
       steps: r.steps
     }));
@@ -935,36 +955,90 @@ function renderPantry(){
   else sum.textContent=`${pantry.length} ${pantry.length===1?"item":"itens"} no total`;
 }
 
+const RECIPE_CATEGORIES = [
+  'Frango','Carnes','Peixes','Massas','Arroz & Grãos',
+  'Legumes','Saladas','Sopas','Café da Manhã','Lanches','Doces','Outros'
+];
+
 function renderRecipes(){
   const grid=document.getElementById("recipe-grid");
   grid.innerHTML="";
-  let visible=recipes.map(r=>({...r,...recipeStatus(r),mealType:getMealType(r)}));
+
+  let visible=recipes.map(r=>({...r,...recipeStatus(r)}));
+
+  // Filtro de busca
   if(recipeSearchQ){
     const q=recipeSearchQ.toLowerCase();
     visible=visible.filter(r=>r.name.toLowerCase().includes(q));
   }
-  // filtros de status
-  if(recipeFilter==="ready"||recipeFilter==="almost"||recipeFilter==="missing"){
-    visible=visible.filter(r=>r.status===recipeFilter);
-  }
-  // filtros de tipo
-  if(recipeFilter==="main") visible=visible.filter(r=>r.mealType==="main");
-  if(recipeFilter==="snack") visible=visible.filter(r=>r.mealType==="snack");
 
-  visible.sort((a,b)=>{
-    const order={ready:0,almost:1,missing:2};
-    if(order[a.status]!==order[b.status]) return order[a.status]-order[b.status];
-    return b.ratio-a.ratio;
-  });
-  for(const r of visible){
+  // Filtro de categoria ou status
+  if(recipeFilter.startsWith("cat:")){
+    const cat=recipeFilter.slice(4);
+    visible=visible.filter(r=>r.category===cat);
+  } else if(recipeFilter==="ready") visible=visible.filter(r=>r.status==="ready");
+  else if(recipeFilter==="almost") visible=visible.filter(r=>r.status==="almost");
+  else if(recipeFilter==="missing") visible=visible.filter(r=>r.status==="missing");
+
+  if(visible.length===0){
+    grid.innerHTML=`<div class="empty-state"><h3>Nenhuma receita encontrada.</h3><p>Tente outro filtro ou termo de busca.</p></div>`;
+    document.getElementById("count-recipes").textContent=recipes.filter(r=>recipeStatus(r).status==="ready").length;
+    return;
+  }
+
+  // Se filtro de categoria específica ou status: lista flat ordenada por status
+  if(recipeFilter!=="all"){
+    visible.sort((a,b)=>{
+      const order={ready:0,almost:1,missing:2};
+      if(order[a.status]!==order[b.status]) return order[a.status]-order[b.status];
+      return a.name.localeCompare(b.name,"pt-BR");
+    });
+    renderRecipeCards(grid, visible);
+  } else {
+    // Agrupa por categoria
+    const byCat={};
+    for(const cat of RECIPE_CATEGORIES) byCat[cat]=[];
+    for(const r of visible){
+      const cat=r.category||"Outros";
+      if(!byCat[cat]) byCat[cat]=[];
+      byCat[cat].push(r);
+    }
+
+    for(const cat of RECIPE_CATEGORIES){
+      const items=byCat[cat];
+      if(!items||items.length===0) continue;
+
+      items.sort((a,b)=>{
+        const order={ready:0,almost:1,missing:2};
+        if(order[a.status]!==order[b.status]) return order[a.status]-order[b.status];
+        return a.name.localeCompare(b.name,"pt-BR");
+      });
+
+      // Cabeçalho da categoria
+      const catHead=document.createElement("div");
+      catHead.style.cssText="grid-column:1/-1;margin-top:24px;margin-bottom:4px;display:flex;align-items:center;gap:14px";
+      catHead.innerHTML=`
+        <h3 style="font-family:var(--font-display);font-weight:900;font-size:22px;letter-spacing:-0.02em;white-space:nowrap">${cat}</h3>
+        <div style="flex:1;height:1.5px;background:var(--rule)"></div>
+        <span style="font-family:var(--font-italic);font-style:italic;color:var(--black-60);font-size:14px">${items.length} receita${items.length!==1?"s":""}</span>
+      `;
+      grid.appendChild(catHead);
+
+      renderRecipeCards(grid, items);
+    }
+  }
+
+  document.getElementById("count-recipes").textContent=recipes.filter(r=>recipeStatus(r).status==="ready").length;
+}
+
+function renderRecipeCards(container, list){
+  for(const r of list){
     const card=document.createElement("div");
     card.className=`recipe-card status-${r.status}`;
     card.dataset.recipeId=r.id;
-    const mealBadge=r.mealType==="main"?"🍽 Refeição":"☕ Café & Lanche";
     card.innerHTML=`
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <div class="recipe-status ${r.status}">${statusLabel(r.status)}</div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--black-60)">${mealBadge}</div>
       </div>
       <h3 class="recipe-name">${r.name}</h3>
       <div class="recipe-meta">
@@ -976,15 +1050,11 @@ function renderRecipes(){
         <div class="recipe-progress-text">${r.have} de ${r.total} ingredientes na despensa</div>
       </div>
       <div style="margin-top:4px">
-        <button class="btn is-ghost is-sm" data-action="edit-recipe" data-recipe-id="${r.id}" style="font-size:10px;padding:6px 14px">✎ Editar receita</button>
+        <button class="btn is-ghost is-sm" data-action="edit-recipe" data-recipe-id="${r.id}" style="font-size:10px;padding:6px 14px">✎ Editar</button>
       </div>
     `;
-    grid.appendChild(card);
+    container.appendChild(card);
   }
-  if(visible.length===0){
-    grid.innerHTML=`<div class="empty-state"><h3>Nenhuma receita encontrada.</h3><p>Tente outro filtro ou termo de busca.</p></div>`;
-  }
-  document.getElementById("count-recipes").textContent=recipes.filter(r=>recipeStatus(r).status==="ready").length;
 }
 
 const MEAL_EMOJI=["☕","🍽","🍎","🌙"];
@@ -1437,13 +1507,13 @@ document.getElementById("recipe-search").addEventListener("input",e=>{
   recipeSearchQ=e.target.value;
   renderRecipes();
 });
-document.querySelectorAll(".filter-pill").forEach(p=>{
-  p.addEventListener("click",()=>{
-    document.querySelectorAll(".filter-pill").forEach(x=>x.classList.remove("active"));
-    p.classList.add("active");
-    recipeFilter=p.dataset.filter;
-    renderRecipes();
-  });
+document.getElementById("recipe-filters").addEventListener("click",e=>{
+  const pill=e.target.closest(".filter-pill");
+  if(!pill) return;
+  document.querySelectorAll(".filter-pill").forEach(x=>x.classList.remove("active"));
+  pill.classList.add("active");
+  recipeFilter=pill.dataset.filter;
+  renderRecipes();
 });
 
 document.getElementById("menu-week").addEventListener("click",e=>{
@@ -1524,7 +1594,7 @@ function openEditModal(recipeId){
   document.getElementById("edit-name").value = r.name;
   document.getElementById("edit-time").value = r.time;
   document.getElementById("edit-serves").value = r.serves;
-  document.getElementById("edit-type").value = r.mealType||"main";
+  document.getElementById("edit-category").value = r.category||"Outros";
 
   // Ingredientes
   renderEditIngredients(r.ingredients);
@@ -1567,7 +1637,7 @@ async function saveEditedRecipe(){
   const name = document.getElementById("edit-name").value.trim();
   const time = document.getElementById("edit-time").value.trim();
   const serves = parseInt(document.getElementById("edit-serves").value)||1;
-  const mealType = document.getElementById("edit-type").value;
+  const category = document.getElementById("edit-category").value;
   const stepsRaw = document.getElementById("edit-steps").value;
   const steps = stepsRaw.split("\n").map(s=>s.trim()).filter(Boolean);
 
@@ -1588,7 +1658,7 @@ async function saveEditedRecipe(){
   btn.disabled=true;
 
   const {error} = await sb.from("cozinha_receitas").update({
-    name, time_min:time, serves, meal_type:mealType, ingredients, steps
+    name, time_min:time, serves, category, ingredients, steps
   }).eq("id", editingRecipeId);
 
   if(error){
@@ -1598,10 +1668,9 @@ async function saveEditedRecipe(){
     return;
   }
 
-  // Atualiza localmente
   const idx = recipes.findIndex(r=>r.id===editingRecipeId);
   if(idx>=0){
-    recipes[idx] = {...recipes[idx], name, time, serves, mealType, ingredients, steps};
+    recipes[idx] = {...recipes[idx], name, time, serves, category, ingredients, steps};
   }
 
   closeEditModal();
