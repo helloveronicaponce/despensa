@@ -591,40 +591,82 @@ async function loadFromDB(){
   showToast("Cardápio carregado ✓");
 }}
 
-// ── DESPENSA — localStorage ───────────────────────────────────
-const PANTRY_KEY = "cozinha_despensa_v1";
+// ============================================================
+// SUPABASE
+// ============================================================
+const SUPA_URL = "https://qwlegnebejakwwuntyrd.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bGVnbmViZWpha3d3dW50eXJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2OTUxODYsImV4cCI6MjA5MTI3MTE4Nn0.lkYjF5xXwS_XW8Wi-p0YBBOxY7Bjs_HDw7PIWDTcPYQ";
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-const PANTRY_DEFAULT = [
-  {name:"Tomate",qty:6,unit:"un",category:"Hortifrúti"},{name:"Cebola",qty:4,unit:"un",category:"Hortifrúti"},
-  {name:"Alho",qty:5,unit:"dente",category:"Hortifrúti"},{name:"Batata",qty:1.5,unit:"kg",category:"Hortifrúti"},
-  {name:"Cenoura",qty:3,unit:"un",category:"Hortifrúti"},{name:"Limão",qty:4,unit:"un",category:"Hortifrúti"},
-  {name:"Banana",qty:6,unit:"un",category:"Hortifrúti"},{name:"Ovos",qty:1,unit:"cx",category:"Proteínas"},
-  {name:"Frango (peito)",qty:0.8,unit:"kg",category:"Proteínas"},{name:"Carne moída",qty:0.5,unit:"kg",category:"Proteínas"},
-  {name:"Leite",qty:2,unit:"L",category:"Laticínios"},{name:"Manteiga",qty:1,unit:"un",category:"Laticínios"},
-  {name:"Queijo mussarela",qty:0.3,unit:"kg",category:"Laticínios"},{name:"Requeijão",qty:1,unit:"un",category:"Laticínios"},
-  {name:"Arroz",qty:2,unit:"kg",category:"Grãos"},{name:"Feijão",qty:1,unit:"kg",category:"Grãos"},
-  {name:"Macarrão",qty:2,unit:"pct",category:"Grãos"},{name:"Farinha de trigo",qty:1,unit:"kg",category:"Grãos"},
-  {name:"Pão de forma",qty:1,unit:"pct",category:"Grãos"},{name:"Café",qty:1,unit:"pct",category:"Bebidas"},
-  {name:"Açúcar",qty:1,unit:"kg",category:"Outros"},{name:"Sal",qty:1,unit:"pct",category:"Outros"},
-  {name:"Óleo",qty:1,unit:"L",category:"Outros"},{name:"Vinagre",qty:1,unit:"L",category:"Outros"},
-  {name:"Papel higiênico",qty:1,unit:"pct",category:"Higiene"},{name:"Detergente",qty:2,unit:"un",category:"Limpeza"},
-  {name:"Sabão em pó",qty:1,unit:"un",category:"Limpeza"}
-];
+let dbReady = false;
 
-function loadPantryLocal(){
-  try {
-    const saved = localStorage.getItem(PANTRY_KEY);
-    return saved ? JSON.parse(saved) : PANTRY_DEFAULT;
-  } catch(e) { return PANTRY_DEFAULT; }
+// ── DESPENSA ─────────────────────────────────────────────────
+
+async function loadDespensa(){
+  const {data, error} = await sb
+    .from("cozinha_despensa")
+    .select("name, qty, unit, category")
+    .order("category").order("name");
+  if(error){ console.warn("Erro ao carregar despensa:", error); return; }
+  if(data && data.length > 0){
+    pantry = data.map(r=>({
+      name: r.name,
+      qty: parseFloat(r.qty),
+      unit: r.unit,
+      category: r.category
+    }));
+  }
 }
 
-function savePantryLocal(){
-  try { localStorage.setItem(PANTRY_KEY, JSON.stringify(pantry)); } catch(e) {}
+async function savePantryItem(item){
+  await sb.from("cozinha_despensa").upsert(
+    {name: item.name, qty: item.qty, unit: item.unit, category: item.category},
+    {onConflict: "name"}
+  );
+}
+
+async function deletePantryItem(name){
+  await sb.from("cozinha_despensa").delete().eq("name", name);
+}
+
+// ── CARDÁPIO ─────────────────────────────────────────────────
+
+async function loadCardapio(){
+  const {data, error} = await sb
+    .from("cozinha_cardapio")
+    .select("day_index, meal_index, recipe_name")
+    .order("day_index").order("meal_index");
+  if(error){ console.warn("Erro ao carregar cardápio:", error); return; }
+  if(data){
+    week = Array.from({length:7},()=>[null,null,null,null]);
+    data.forEach(r=>{
+      if(r.day_index >= 0 && r.day_index < 7 && r.meal_index >= 0 && r.meal_index < 4){
+        week[r.day_index][r.meal_index] = r.recipe_name || null;
+      }
+    });
+  }
+}
+
+async function saveCardapioSlot(dayIdx, mealIdx, recipeName){
+  if(!recipeName){
+    await sb.from("cozinha_cardapio").delete()
+      .eq("day_index", dayIdx).eq("meal_index", mealIdx);
+  } else {
+    await sb.from("cozinha_cardapio").upsert(
+      {day_index: dayIdx, meal_index: mealIdx, recipe_id: null, recipe_name: recipeName},
+      {onConflict: "day_index,meal_index"}
+    );
+  }
+}
+
+async function clearCardapioDB(){
+  await sb.from("cozinha_cardapio").delete().gte("day_index", 0);
 }
 
 // ── BOOT ─────────────────────────────────────────────────────
+
 async function loadFromDB(){
-  await loadCardapio();
+  await Promise.all([loadDespensa(), loadCardapio()]);
   dbReady = true;
   renderAll();
 }
@@ -646,7 +688,7 @@ const STANDARD=[
   {name:"Esponja de cozinha",qty:1,unit:"un",category:"Limpeza"},{name:"Sabonete",qty:1,unit:"un",category:"Higiene"}
 ];
 
-let pantry = loadPantryLocal();
+let pantry = []; // carregado do Supabase no boot
 
 const recipes=[
   {id:1,name:"Arroz com Feijão",time:"40 min",serves:4,ingredients:[{name:"Arroz",qty:0.3,unit:"kg"},{name:"Feijão",qty:0.3,unit:"kg"},{name:"Cebola",qty:1,unit:"un"},{name:"Alho",qty:3,unit:"dente"},{name:"Óleo",qty:0.05,unit:"L"},{name:"Sal",qty:0.01,unit:"pct"}],steps:["Deixe o feijão de molho na água por 1 hora","Cozinhe o feijão na panela de pressão por 30 min","Em outra panela, refogue alho e cebola no óleo","Adicione o arroz, mexa, cubra com água quente e sal","Tampe e cozinhe em fogo baixo por 18 min","Tempere o feijão cozido com alho refogado e sal"]},
@@ -1214,9 +1256,8 @@ document.getElementById("add-form").addEventListener("submit",e=>{
   const category=document.getElementById("add-category").value;
   if(!name||isNaN(qty)) return;
   const existing=findInPantry(name);
-  if(existing){existing.qty+=qty;}
-  else{pantry.push({name,qty,unit,category});}
-  savePantryLocal();
+  if(existing){existing.qty+=qty; if(dbReady) savePantryItem(existing);}
+  else{const item={name,qty,unit,category}; pantry.push(item); if(dbReady) savePantryItem(item);}
   e.target.reset();
   document.getElementById("add-name").focus();
   renderAll();
@@ -1247,10 +1288,10 @@ document.getElementById("pantry-list-root").addEventListener("click",e=>{
       if(!isNaN(raw) && raw>=0){
         item.qty=Math.round(raw*10)/10;
         if(item.qty===0 && !PRIORITY.has(item.name)){
+          if(dbReady) deletePantryItem(item.name);
           pantry=pantry.filter(p=>p!==item);
-        }
+        } else if(dbReady) savePantryItem(item);
       }
-      savePantryLocal();
       renderAll();
     };
     input.addEventListener("keydown",e=>{
@@ -1262,13 +1303,13 @@ document.getElementById("pantry-list-root").addEventListener("click",e=>{
     return;
   }
 
-  if(action==="inc"){ item.qty=Math.round((item.qty+1)*10)/10; }
+  if(action==="inc"){ item.qty=Math.round((item.qty+1)*10)/10; if(dbReady) savePantryItem(item); }
   if(action==="dec"){
     item.qty=Math.max(0,Math.round((item.qty-1)*10)/10);
-    if(item.qty===0 && !PRIORITY.has(item.name)){ pantry=pantry.filter(p=>p!==item); }
+    if(item.qty===0 && !PRIORITY.has(item.name)){ if(dbReady) deletePantryItem(item.name); pantry=pantry.filter(p=>p!==item); }
+    else if(dbReady) savePantryItem(item);
   }
-  if(action==="del"){ pantry=pantry.filter(p=>p!==item); }
-  savePantryLocal();
+  if(action==="del"){ if(dbReady) deletePantryItem(item.name); pantry=pantry.filter(p=>p!==item); }
   renderAll();
 });
 
