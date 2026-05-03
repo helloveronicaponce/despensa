@@ -755,21 +755,36 @@ let dbReady = false;
 // ── CARDÁPIO — lê recipe_name (texto livre) do banco ─────────
 
 async function loadCardapio(){
-  const {data, error} = await sb
+  // Tenta buscar com recipe_names; se falhar, busca só recipe_name
+  let data, error;
+  ({data, error} = await sb
     .from("cozinha_cardapio")
     .select("day_index, meal_index, recipe_name, recipe_names")
-    .order("day_index").order("meal_index");
-  if(error){ console.warn("Erro ao carregar cardápio:", error); return; }
+    .order("day_index").order("meal_index"));
+
+  if(error){
+    console.warn("Erro ao carregar cardápio (com recipe_names):", error);
+    // Fallback sem recipe_names
+    ({data, error} = await sb
+      .from("cozinha_cardapio")
+      .select("day_index, meal_index, recipe_name")
+      .order("day_index").order("meal_index"));
+    if(error){ console.warn("Erro ao carregar cardápio:", error); return; }
+  }
+
   if(data){
     week = Array.from({length:7},()=>[[],[],[],[]]);
-    // Agrupa todas as linhas por (day_index, meal_index)
-    // Cada linha pode ter recipe_names (array com 1 nome) ou recipe_name (string legado)
     data.forEach(r=>{
       const d=r.day_index, m=r.meal_index;
+      if(d===null||d===undefined||m===null||m===undefined) return;
       if(d<0||d>6||m<0||m>3) return;
+
+      // Prioridade 1: recipe_names com conteúdo
       if(Array.isArray(r.recipe_names) && r.recipe_names.length>0){
         r.recipe_names.forEach(name=>{ if(name && !week[d][m].includes(name)) week[d][m].push(name); });
-      } else if(r.recipe_name){
+      }
+      // Prioridade 2: recipe_name (legado / Nina)
+      else if(r.recipe_name){
         if(!week[d][m].includes(r.recipe_name)) week[d][m].push(r.recipe_name);
       }
     });
@@ -884,7 +899,7 @@ async function clearCardapioDB(){
 // ── BOOT ─────────────────────────────────────────────────────
 
 async function loadFromDB(){
-  await Promise.all([loadReceitas(), loadDespensa(), loadCardapio()]);
+  await Promise.allSettled([loadReceitas(), loadDespensa(), loadCardapio()]);
   dbReady = true;
   renderAll();
 }
