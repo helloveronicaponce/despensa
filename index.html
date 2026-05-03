@@ -1043,10 +1043,10 @@ function renderList(){
   const priorityList=buildPriorityList();
   root.innerHTML="";
 
-  // ── Helper: renderiza um bloco de itens agrupados por categoria ──
-  function renderBlock({title, sub, items, countColor}){
+  function renderBlock({title, sub, items, isPriority, countColor}){
     const section=document.createElement("div");
-    section.className="list-section is-priority";
+    // bloco de casa: borda superior verde-limão; bloco de receitas: visual normal
+    section.className="list-section"+(isPriority?" is-priority":"");
 
     // Agrupa por categoria
     const byCat={};
@@ -1057,7 +1057,7 @@ function renderList(){
     }
     const cats=CATEGORIES.filter(c=>byCat[c]);
 
-    // Cabeçalho do bloco
+    // Cabeçalho
     const head=document.createElement("div");
     head.className="list-section-head";
     head.innerHTML=`
@@ -1072,28 +1072,34 @@ function renderList(){
     if(items.length===0){
       const empty=document.createElement("div");
       empty.className="italic";
-      empty.style.cssText=`color:var(--black-60);padding:16px 0`;
-      empty.textContent=title.includes("receita")
-        ?(week.flat().filter(x=>x).length===0?"Adicione refeições ao cardápio para gerar a lista.":"Você já tem tudo. Pode cozinhar.")
+      empty.style.cssText="color:var(--black-60);padding:16px 0";
+      empty.textContent=!isPriority
+        ?(week.flat().filter(x=>x).length===0
+          ?"Adicione refeições ao cardápio para gerar a lista."
+          :"Você já tem tudo. Pode cozinhar.")
         :"Tudo em ordem por aqui.";
       section.appendChild(empty);
       root.appendChild(section);
       return;
     }
 
-    // Categorias
+    // Itens agrupados por categoria
     for(const cat of cats){
       const catItems=byCat[cat];
 
+      // Separador de categoria
       const catLabel=document.createElement("div");
-      catLabel.style.cssText=`
-        font-family:var(--font-display);font-weight:900;
-        font-size:11px;letter-spacing:0.08em;text-transform:uppercase;
-        color:var(--black-40);
-        padding:14px 0 6px;
-        border-top:1px solid var(--rule);
-        margin-top:4px;
-      `;
+      catLabel.style.cssText=[
+        "font-family:var(--font-display)",
+        "font-weight:900",
+        "font-size:11px",
+        "letter-spacing:0.08em",
+        "text-transform:uppercase",
+        "color:var(--black-40)",
+        "padding:14px 0 6px",
+        "border-top:1px solid var(--rule)",
+        "margin-top:4px"
+      ].join(";");
       catLabel.textContent=cat;
       section.appendChild(catLabel);
 
@@ -1102,25 +1108,23 @@ function renderList(){
       section.appendChild(grid);
 
       for(const item of catItems){
-        const prefix=isPriority?"prio":"rec";
-        const key=`${prefix}-${item.name}`;
+        const key=(isPriority?"prio":"rec")+"-"+item.name;
         const row=document.createElement("div");
-        row.className=`list-item ${checkedItems.has(key)?"checked":""}`;
+        row.className="list-item"+(checkedItems.has(key)?" checked":"");
         row.dataset.key=key;
 
-        let badgeHtml="";
+        let badge="";
         if(isPriority && item.reason){
-          const reasonLabel=item.reason==="essential"?"Essencial":item.reason==="zero"?"Zerado":"Baixo";
-          const reasonBg=item.reason==="essential"?"var(--lime)":item.reason==="zero"?"var(--pink)":"var(--black-12)";
-          const reasonFg=item.reason==="essential"?"var(--black)":"var(--black)";
-          badgeHtml=`<span style="padding:2px 8px;border-radius:999px;font-size:8px;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;background:${reasonBg};color:${reasonFg};flex-shrink:0">${reasonLabel}</span>`;
+          const label=item.reason==="essential"?"Essencial":item.reason==="zero"?"Zerado":"Baixo";
+          const bg=item.reason==="essential"?"var(--lime)":item.reason==="zero"?"var(--pink)":"var(--black-12)";
+          badge=`<span style="padding:2px 8px;border-radius:999px;font-size:8px;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;background:${bg};color:var(--black);flex-shrink:0">${label}</span>`;
         }
 
         row.innerHTML=`
           <div class="list-checkbox"></div>
           <div class="list-item-name">${item.name}</div>
           <div class="list-item-qty">${fmtQty(item.qty)} ${item.unit}</div>
-          ${badgeHtml}
+          ${badge}
         `;
         grid.appendChild(row);
       }
@@ -1129,26 +1133,24 @@ function renderList(){
     root.appendChild(section);
   }
 
-  // ── Bloco 1: Lista padrão da casa ────────────────────────────
-  let isPriority=true;
+  // Bloco 1 — Casa & Essenciais
   renderBlock({
     title:"Lista padrão da casa",
     sub:"Itens essenciais que estão em falta ou abaixo do mínimo.",
     items:priorityList,
+    isPriority:true,
     countColor:"var(--black)"
   });
 
-  // ── Bloco 2: Receitas da semana ───────────────────────────────
-  isPriority=false;
-  const enriched=recipeList.map(item=>{
-    const inP=findInPantry(item.name);
-    return {...item, category: inP?inP.category:"Outros"};
-  });
-
+  // Bloco 2 — Receitas da semana (enriquece com categoria da despensa)
   renderBlock({
     title:"Para as receitas da semana",
     sub:"O que falta para fazer o que você planejou.",
-    items:enriched,
+    items:recipeList.map(item=>{
+      const inP=findInPantry(item.name);
+      return {...item, category:inP?inP.category:"Outros"};
+    }),
+    isPriority:false,
     countColor:null
   });
 
