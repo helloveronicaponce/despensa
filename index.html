@@ -279,7 +279,28 @@ html,body{
 .meal-card.has-recipe .meal-card-label{color:var(--black-60)}
 .meal-card-label-emoji{font-size:12px}
 
-.meal-card-recipe{
+.meal-recipes-list{display:flex;flex-direction:column;gap:4px;flex:1}
+.meal-recipe-item{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 6px;border-radius:6px;
+  background:var(--black-06);
+  cursor:pointer;transition:background var(--dur);
+}
+.meal-recipe-item:hover{background:rgba(212,255,61,0.15)}
+.meal-recipe-name{
+  flex:1;font-family:var(--font-display);font-weight:900;
+  font-size:12px;letter-spacing:-0.01em;line-height:1.2;
+  text-decoration:underline;text-decoration-color:transparent;
+  text-underline-offset:2px;transition:text-decoration-color var(--dur);
+}
+.meal-recipe-item:hover .meal-recipe-name{text-decoration-color:var(--black)}
+.meal-recipe-remove{
+  width:18px;height:18px;border:none;background:transparent;
+  color:var(--black-60);cursor:pointer;font-size:11px;
+  display:grid;place-items:center;border-radius:3px;
+  transition:background var(--dur),color var(--dur);flex-shrink:0;
+}
+.meal-recipe-remove:hover{background:var(--pink);color:var(--off-white)}
   font-family:var(--font-display);font-weight:900;
   font-size:13px;letter-spacing:-0.01em;line-height:1.2;
   flex:1;
@@ -665,17 +686,23 @@ async function loadCardapio(){
     .order("day_index").order("meal_index");
   if(error){ console.warn("Erro ao carregar cardápio:", error); return; }
   if(data){
-    week = Array.from({length:7},()=>[null,null,null,null]);
+    week = Array.from({length:7},()=>[[],[],[],[]]);
     data.forEach(r=>{
       if(r.day_index >= 0 && r.day_index < 7 && r.meal_index >= 0 && r.meal_index < 4){
-        week[r.day_index][r.meal_index] = r.recipe_name || null;
+        // Suporta tanto recipe_names (novo) quanto recipe_name (legado)
+        if(Array.isArray(r.recipe_names) && r.recipe_names.length > 0){
+          week[r.day_index][r.meal_index] = r.recipe_names;
+        } else if(r.recipe_name){
+          week[r.day_index][r.meal_index] = [r.recipe_name];
+        }
       }
     });
   }
 }
 
-async function saveCardapioSlot(dayIdx, mealIdx, recipeName){
-  if(!recipeName){
+async function saveCardapioSlot(dayIdx, mealIdx, names){
+  // names = array de strings
+  if(!names || names.length === 0){
     await sb.from("cozinha_cardapio").delete()
       .eq("day_index", dayIdx).eq("meal_index", mealIdx);
   } else {
@@ -683,14 +710,14 @@ async function saveCardapioSlot(dayIdx, mealIdx, recipeName){
       day_index: dayIdx,
       meal_index: mealIdx,
       recipe_id: null,
-      recipe_name: recipeName
+      recipe_name: names[0], // legado
+      recipe_names: names    // novo
     }, {onConflict: "day_index,meal_index"});
   }
 }
 
 async function clearCardapioDB(){
-  await sb.from("cozinha_cardapio")
-    .delete().gte("day_index", 0);
+  await sb.from("cozinha_cardapio").delete().gte("day_index", 0);
 }
 
 
@@ -843,7 +870,7 @@ function getMealType(recipe){
   const hasHeavy=recipe.ingredients.some(i=>["arroz","feijão","macarrão","carne moída","frango (peito)"].includes(i.name.toLowerCase()));
   return hasHeavy?"main":"snack";
 }
-let week=Array.from({length:7},()=>[null,null,null,null]);
+let week=Array.from({length:7},()=>[[],[],[],[]]);
 let pantrySearchQ="";
 let recipeFilter="all";
 let recipeSearchQ="";
@@ -1017,37 +1044,51 @@ function renderWeek(){
       card.dataset.day=i;
       card.dataset.meal=m;
 
-      if(recipeName){
-        total++;
-        card.dataset.recipeName=recipeName;
-        card.innerHTML=`
-          <div class="meal-card-label">
-            <span class="meal-card-label-emoji">${MEAL_EMOJI[m]}</span>
-            ${REFEICOES_LABEL[REFEICOES[m]]}
-          </div>
-          <div class="meal-card-recipe" data-action="view" style="cursor:pointer" title="Ver receita">${recipeName}</div>
+    for(let m=0;m<REFEICOES.length;m++){
+      const names=week[i][m]; // array de strings
+      const card=document.createElement("div");
+      card.className="meal-card"+(names.length>0?" has-recipe":"");
+      card.dataset.day=i;
+      card.dataset.meal=m;
+
+      let inner=`
+        <div class="meal-card-label">
+          <span class="meal-card-label-emoji">${MEAL_EMOJI[m]}</span>
+          ${REFEICOES_LABEL[REFEICOES[m]]}
+        </div>
+      `;
+
+      if(names.length>0){
+        total+=names.length;
+        inner+=`<div class="meal-recipes-list">`;
+        names.forEach((name,idx)=>{
+          inner+=`
+            <div class="meal-recipe-item" data-action="view" data-name="${name}" data-day="${i}" data-meal="${m}" data-idx="${idx}">
+              <span class="meal-recipe-name">${name}</span>
+              <button class="meal-recipe-remove" data-action="remove-recipe" data-day="${i}" data-meal="${m}" data-idx="${idx}" title="Remover">✕</button>
+            </div>
+          `;
+        });
+        inner+=`</div>`;
+        inner+=`
           <div class="meal-card-actions">
-            <button class="meal-card-btn" data-action="change" data-day="${i}" data-meal="${m}">Trocar</button>
-            <button class="meal-card-btn is-remove" data-action="clear" data-day="${i}" data-meal="${m}">✕</button>
+            <button class="meal-card-btn" data-action="add-recipe" data-day="${i}" data-meal="${m}">+ Prato</button>
+            <button class="meal-card-btn is-remove" data-action="clear" data-day="${i}" data-meal="${m}">Limpar tudo</button>
           </div>
         `;
       } else {
-        card.innerHTML=`
-          <div class="meal-card-label">
-            <span class="meal-card-label-emoji">${MEAL_EMOJI[m]}</span>
-            ${REFEICOES_LABEL[REFEICOES[m]]}
-          </div>
-          <div class="meal-card-empty">+ Escolher</div>
-        `;
+        inner+=`<div class="meal-card-empty">+ Escolher</div>`;
       }
+
+      card.innerHTML=inner;
       mealsGrid.appendChild(card);
+    }
     }
 
     row.appendChild(mealsGrid);
     root.appendChild(row);
   }
   document.getElementById("count-week").textContent=total;
-}
 
 // Estado do picker
 let pickerDay=null, pickerMeal=null;
@@ -1097,9 +1138,12 @@ function renderPickerList(q){
     `;
     item.addEventListener("click",()=>{
       if(pickerDay!==null){
-        week[pickerDay][pickerMeal]=r.name;
-        if(dbReady) saveCardapioSlot(pickerDay, pickerMeal, r.name);
-        ensureIngredientesNaDespensa(r.name);
+        const current = week[pickerDay][pickerMeal];
+        if(!current.includes(r.name)){
+          current.push(r.name);
+          if(dbReady) saveCardapioSlot(pickerDay, pickerMeal, current);
+          ensureIngredientesNaDespensa(r.name);
+        }
       }
       closePicker();
       renderAll();
@@ -1151,38 +1195,24 @@ function buildUnifiedList(){
   }
 
   // 3. Ingredientes das receitas do cardápio
-  // Regras:
-  // - Não tem na despensa → falta, entra com tag Semana
-  // - Tem com qty = 0 → falta, entra com tag Semana
-  // - Tem mas unidade diferente da receita → incerto, entra com tag Semana
-  // - Tem com mesma unidade e qty suficiente → ok, não entra
-  // - Tem com mesma unidade e qty insuficiente → falta, entra com tag Semana
   for(let i=0;i<7;i++){
     for(let m=0;m<4;m++){
-      const recipeName = week[i][m];
-      if(!recipeName) continue;
-      const recipe = recipes.find(r=>r.name.toLowerCase()===recipeName.toLowerCase());
-      if(!recipe) continue;
-      for(const ing of recipe.ingredients){
-        const inP = findInPantry(ing.name);
-        let precisaComprar = false;
-
-        if(!inP || inP.qty <= 0){
-          // Não tem ou zerado
-          precisaComprar = true;
-        } else if(inP.unit !== ing.unit){
-          // Unidade diferente — não dá pra comparar, conservador: marca como necessário
-          precisaComprar = true;
-        } else if(inP.qty < ing.qty){
-          // Mesma unidade mas quantidade insuficiente
-          precisaComprar = true;
-        }
-
-        if(precisaComprar){
-          const category = inP ? inP.category : "Outros";
-          // Usa a unidade da despensa se existir, senão da receita
-          const unit = inP ? inP.unit : ing.unit;
-          add(ing.name, ing.qty, unit, category, "Semana");
+      const names = week[i][m]; // array
+      for(const recipeName of names){
+        if(!recipeName) continue;
+        const recipe = recipes.find(r=>r.name.toLowerCase()===recipeName.toLowerCase());
+        if(!recipe) continue;
+        for(const ing of recipe.ingredients){
+          const inP = findInPantry(ing.name);
+          let precisaComprar = false;
+          if(!inP || inP.qty <= 0){ precisaComprar = true; }
+          else if(inP.unit !== ing.unit){ precisaComprar = true; }
+          else if(inP.qty < ing.qty){ precisaComprar = true; }
+          if(precisaComprar){
+            const category = inP ? inP.category : "Outros";
+            const unit = inP ? inP.unit : ing.unit;
+            add(ing.name, ing.qty, unit, category, "Semana");
+          }
         }
       }
     }
@@ -1331,15 +1361,19 @@ document.getElementById("add-week-btn").addEventListener("click",()=>{
   let found=false;
   outer: for(let i=0;i<7;i++){
     for(let m=0;m<REFEICOES.length;m++){
-      if(!week[i][m]){
-        week[i][m]=modalRecipeId;
-        if(dbReady) saveCardapioSlot(i,m,modalRecipeId);
+      if(week[i][m].length===0){
+        week[i][m].push(modalRecipeId);
+        if(dbReady) saveCardapioSlot(i,m,week[i][m]);
         found=true;
         break outer;
       }
     }
   }
-  if(!found){alert("Cardápio cheio. Limpe um slot primeiro.");return;}
+  if(!found){
+    // adiciona no primeiro slot do primeiro dia
+    week[0][0].push(modalRecipeId);
+    if(dbReady) saveCardapioSlot(0,0,week[0][0]);
+  }
   ensureIngredientesNaDespensa(modalRecipeId);
   closeModal();
   switchTab("week");
@@ -1445,25 +1479,31 @@ document.querySelectorAll(".filter-pill").forEach(p=>{
   });
 });
 
-// Cardápio — cliques nos cards
 document.getElementById("menu-week").addEventListener("click",e=>{
   const btn=e.target.closest("[data-action]");
   if(btn){
     const day=parseInt(btn.dataset.day);
     const meal=parseInt(btn.dataset.meal);
+
     if(btn.dataset.action==="clear"){
-      week[day][meal]=null;
-      if(dbReady) saveCardapioSlot(day, meal, null);
+      week[day][meal]=[];
+      if(dbReady) saveCardapioSlot(day,meal,[]);
       renderAll();
       return;
     }
-    if(btn.dataset.action==="change"){
+    if(btn.dataset.action==="add-recipe"){
       openPickerAt(day,meal);
       return;
     }
+    if(btn.dataset.action==="remove-recipe"){
+      const idx=parseInt(btn.dataset.idx);
+      week[day][meal].splice(idx,1);
+      if(dbReady) saveCardapioSlot(day,meal,week[day][meal]);
+      renderAll();
+      return;
+    }
     if(btn.dataset.action==="view"){
-      const card=btn.closest(".meal-card");
-      const name=card?card.dataset.recipeName:null;
+      const name=btn.dataset.name||btn.closest("[data-name]")?.dataset.name;
       if(name) openModalByName(name);
       return;
     }
@@ -1490,7 +1530,7 @@ document.getElementById("picker-overlay").addEventListener("click",e=>{
 
 // Limpar semana
 document.getElementById("clear-week").addEventListener("click",()=>{
-  week=Array.from({length:7},()=>[null,null,null,null]);
+  week=Array.from({length:7},()=>[[],[],[],[]]);
   if(dbReady) clearCardapioDB();
   renderAll();
 });
