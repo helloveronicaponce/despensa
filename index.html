@@ -908,19 +908,9 @@ async function clearCardapioDB(){
 // ── BOOT ─────────────────────────────────────────────────────
 
 async function loadFromDB(){
-  try {
-    await Promise.allSettled([loadReceitas(), loadDespensa(), loadCardapio()]);
-    dbReady = true;
-    renderAll();
-    // Diagnóstico rápido — remove depois de confirmar
-    if(recipes.length === 0){
-      showToast("⚠️ Receitas não carregaram. Verifique o console.");
-      console.error("Receitas vazias após loadReceitas");
-    }
-  } catch(e){
-    console.error("Erro no loadFromDB:", e);
-    showToast("Erro ao carregar dados: "+e.message);
-  }
+  await Promise.allSettled([loadReceitas(), loadDespensa(), loadCardapio()]);
+  dbReady = true;
+  renderAll();
 }
 const UNITS=["un","kg","g","L","ml","cx","pct","dente","fatia"];
 const CATEGORIES=["Hortifrúti","Proteínas","Laticínios","Grãos","Bebidas","Higiene","Limpeza","Outros"];
@@ -1140,6 +1130,9 @@ function renderRecipes(){
   const subEl=document.getElementById("recipes-sub");
   if(subEl) subEl.textContent=`${recipes.length} receitas no catálogo. Cada uma cruzada com o que você tem.`;
   document.getElementById("count-recipes").textContent=recipes.filter(r=>recipeStatus(r).status==="ready").length;
+}
+
+function renderRecipeCards(container, list){
   for(const r of list){
     const card=document.createElement("div");
     card.className=`recipe-card status-${r.status}`;
