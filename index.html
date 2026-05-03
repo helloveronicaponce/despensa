@@ -162,11 +162,40 @@ html,body{
 .ing-remove:hover{background:var(--pink);color:var(--off-white)}
 .recipe-toolbar{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;align-items:center}
 .recipe-search{flex:1;min-width:260px;padding:12px 16px;border:1.5px solid var(--black);border-radius:var(--r-pill);background:var(--off-white);font-family:var(--font-body);font-size:14px;outline:none;transition:box-shadow var(--dur)}
+.recipe-toolbar{display:flex;flex-direction:column;gap:14px;margin-bottom:28px}
+.recipe-toolbar-top{display:flex;gap:10px;align-items:center}
+.recipe-search{flex:1;min-width:240px;padding:12px 16px;border:1.5px solid var(--black);border-radius:var(--r-pill);background:var(--off-white);font-family:var(--font-body);font-size:14px;outline:none;transition:box-shadow var(--dur)}
 .recipe-search:focus{box-shadow:var(--shadow-2)}
-.filter-pills{display:flex;gap:6px;flex-wrap:wrap}
-.filter-pill{padding:8px 14px;border-radius:var(--r-pill);border:1.5px solid var(--black);background:transparent;cursor:pointer;font-family:var(--font-body);font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;transition:background var(--dur),color var(--dur)}
-.filter-pill.active{background:var(--black);color:var(--off-white)}
-.filter-pill:hover:not(.active){background:var(--black-12)}
+
+/* Linha de filtros */
+.recipe-filters-row{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.filter-group{display:flex;align-items:center;gap:8px}
+.filter-group-label{font-family:var(--font-body);font-weight:700;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--black-60);white-space:nowrap}
+
+/* Dropdown de categoria */
+.filter-select{
+  padding:8px 32px 8px 14px;
+  border:1.5px solid var(--black);border-radius:var(--r-pill);
+  background:var(--off-white);
+  font-family:var(--font-body);font-weight:700;font-size:12px;
+  cursor:pointer;outline:none;
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%230F0F0F'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;
+  transition:box-shadow var(--dur);
+}
+.filter-select:focus{box-shadow:var(--shadow-2)}
+.filter-select.is-active{background-color:var(--black);color:var(--off-white);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23FFFCF4'/%3E%3C/svg%3E")}
+
+/* Pills de tempo e possibilidade */
+.filter-pill{padding:7px 13px;border-radius:var(--r-pill);border:1.5px solid var(--black-40);background:transparent;cursor:pointer;font-family:var(--font-body);font-weight:700;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--black-60);transition:background var(--dur),color var(--dur),border-color var(--dur)}
+.filter-pill:hover:not(.active){background:var(--black-12);border-color:var(--black)}
+.filter-pill.active{background:var(--black);color:var(--off-white);border-color:var(--black)}
+.filter-pill.active.is-ready{background:var(--lime);color:var(--black);border-color:var(--lime)}
+.filter-pill.active.is-almost{background:var(--pink);color:var(--off-white);border-color:var(--pink)}
+
+/* Separador vertical entre grupos */
+.filter-sep{width:1px;height:28px;background:var(--rule);flex-shrink:0}
 .recipe-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
 .recipe-card{background:var(--off-white);border-radius:var(--r-md);padding:24px;box-shadow:var(--shadow-1);border:1.5px solid var(--rule);transition:box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease);display:flex;flex-direction:column;gap:14px;cursor:pointer}
 .recipe-card:hover{box-shadow:var(--shadow-2);transform:translateY(-2px)}
@@ -523,26 +552,50 @@ html,body{
       </div>
     </div>
     <div class="recipe-toolbar">
-      <input type="text" class="recipe-search" id="recipe-search" placeholder="Buscar receita..." />
-      <div class="filter-pills" id="recipe-filters">
-        <button class="filter-pill active" data-filter="all">Todas</button>
-        <button class="filter-pill" data-filter="cat:Frango">🍗 Frango</button>
-        <button class="filter-pill" data-filter="cat:Carnes">🥩 Carnes</button>
-        <button class="filter-pill" data-filter="cat:Peixes">🐟 Peixes</button>
-        <button class="filter-pill" data-filter="cat:Massas">🍝 Massas</button>
-        <button class="filter-pill" data-filter="cat:Arroz & Grãos">🍚 Arroz & Grãos</button>
-        <button class="filter-pill" data-filter="cat:Legumes">🥦 Legumes</button>
-        <button class="filter-pill" data-filter="cat:Saladas">🥗 Saladas</button>
-        <button class="filter-pill" data-filter="cat:Sopas">🍲 Sopas</button>
-        <button class="filter-pill" data-filter="cat:Café da Manhã">☕ Café da Manhã</button>
-        <button class="filter-pill" data-filter="cat:Lanches">🥪 Lanches</button>
-        <button class="filter-pill" data-filter="cat:Doces">🍮 Doces</button>
-        <button class="filter-pill" data-filter="time:fast">⚡ Rápidas (até 20min)</button>
-        <button class="filter-pill" data-filter="time:medium">⏱ Médias (21-45min)</button>
-        <button class="filter-pill" data-filter="time:slow">🕐 Demoradas (45min+)</button>
-        <button class="filter-pill" data-filter="ready">✓ Posso fazer</button>
-        <button class="filter-pill" data-filter="almost">~ Quase lá</button>
-        <button class="filter-pill" data-filter="missing">✕ Falta muito</button>
+      <div class="recipe-toolbar-top">
+        <input type="text" class="recipe-search" id="recipe-search" placeholder="Buscar receita..." />
+      </div>
+      <div class="recipe-filters-row">
+
+        <!-- Categoria (dropdown) -->
+        <div class="filter-group">
+          <span class="filter-group-label">Categoria</span>
+          <select class="filter-select" id="filter-cat">
+            <option value="">Todas</option>
+            <option value="Frango">🍗 Frango</option>
+            <option value="Carnes">🥩 Carnes</option>
+            <option value="Peixes">🐟 Peixes</option>
+            <option value="Massas">🍝 Massas</option>
+            <option value="Arroz & Grãos">🍚 Arroz & Grãos</option>
+            <option value="Legumes">🥦 Legumes</option>
+            <option value="Saladas">🥗 Saladas</option>
+            <option value="Sopas">🍲 Sopas</option>
+            <option value="Café da Manhã">☕ Café da Manhã</option>
+            <option value="Lanches">🥪 Lanches</option>
+            <option value="Doces">🍮 Doces</option>
+          </select>
+        </div>
+
+        <div class="filter-sep"></div>
+
+        <!-- Tempo de preparo (pills) -->
+        <div class="filter-group">
+          <span class="filter-group-label">Tempo</span>
+          <button class="filter-pill" data-time="fast">⚡ Rápidas</button>
+          <button class="filter-pill" data-time="medium">⏱ Médias</button>
+          <button class="filter-pill" data-time="slow">🕐 Demoradas</button>
+        </div>
+
+        <div class="filter-sep"></div>
+
+        <!-- Possibilidade de preparo (pills) -->
+        <div class="filter-group">
+          <span class="filter-group-label">Preparo</span>
+          <button class="filter-pill is-ready" data-status="ready">✓ Posso fazer</button>
+          <button class="filter-pill is-almost" data-status="almost">~ Quase lá</button>
+          <button class="filter-pill" data-status="missing">✕ Falta muito</button>
+        </div>
+
       </div>
     </div>
     <div class="recipe-grid" id="recipe-grid"></div>
@@ -869,7 +922,9 @@ function getMealType(recipe){
 }
 let week=Array.from({length:7},()=>[[],[],[],[]]);
 let pantrySearchQ="";
-let recipeFilter="all";
+let recipeFilterCat="";   // "" = todas as categorias
+let recipeFilterTime="";  // "" | "fast" | "medium" | "slow"
+let recipeFilterStatus=""; // "" | "ready" | "almost" | "missing"
 let recipeSearchQ="";
 let modalRecipeId=null;
 const checkedItems=new Set();
@@ -975,22 +1030,20 @@ function renderRecipes(){
     visible=visible.filter(r=>r.name.toLowerCase().includes(q));
   }
 
-  // Filtro de categoria, tempo ou status
-  if(recipeFilter.startsWith("cat:")){
-    const cat=recipeFilter.slice(4);
-    visible=visible.filter(r=>r.category===cat);
-  } else if(recipeFilter.startsWith("time:")){
-    const bucket=recipeFilter.slice(5);
+  // Filtros combinados
+  if(recipeFilterCat) visible=visible.filter(r=>r.category===recipeFilterCat);
+
+  if(recipeFilterTime){
     visible=visible.filter(r=>{
       const mins=parseInt(r.time)||0;
-      if(bucket==="fast") return mins<=20;
-      if(bucket==="medium") return mins>20 && mins<=45;
-      if(bucket==="slow") return mins>45;
+      if(recipeFilterTime==="fast") return mins<=20;
+      if(recipeFilterTime==="medium") return mins>20 && mins<=45;
+      if(recipeFilterTime==="slow") return mins>45;
       return true;
     });
-  } else if(recipeFilter==="ready") visible=visible.filter(r=>r.status==="ready");
-  else if(recipeFilter==="almost") visible=visible.filter(r=>r.status==="almost");
-  else if(recipeFilter==="missing") visible=visible.filter(r=>r.status==="missing");
+  }
+
+  if(recipeFilterStatus) visible=visible.filter(r=>r.status===recipeFilterStatus);
 
   if(visible.length===0){
     grid.innerHTML=`<div class="empty-state"><h3>Nenhuma receita encontrada.</h3><p>Tente outro filtro ou termo de busca.</p></div>`;
@@ -998,8 +1051,9 @@ function renderRecipes(){
     return;
   }
 
-  // Se filtro de categoria específica ou status: lista flat ordenada por status
-  if(recipeFilter!=="all"){
+  // Se algum filtro ativo: lista flat; senão: agrupa por categoria
+  const hasFilter = recipeFilterCat || recipeFilterTime || recipeFilterStatus || recipeSearchQ;
+  if(hasFilter){
     visible.sort((a,b)=>{
       const order={ready:0,almost:1,missing:2};
       if(order[a.status]!==order[b.status]) return order[a.status]-order[b.status];
@@ -1519,13 +1573,41 @@ document.getElementById("recipe-search").addEventListener("input",e=>{
   recipeSearchQ=e.target.value;
   renderRecipes();
 });
-document.getElementById("recipe-filters").addEventListener("click",e=>{
-  const pill=e.target.closest(".filter-pill");
-  if(!pill) return;
-  document.querySelectorAll(".filter-pill").forEach(x=>x.classList.remove("active"));
-  pill.classList.add("active");
-  recipeFilter=pill.dataset.filter;
+// Filtros de receitas — 3 grupos independentes
+document.getElementById("filter-cat").addEventListener("change",e=>{
+  recipeFilterCat=e.target.value;
+  e.target.classList.toggle("is-active", !!e.target.value);
   renderRecipes();
+});
+
+document.querySelectorAll("[data-time]").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    const val=btn.dataset.time;
+    if(recipeFilterTime===val){
+      recipeFilterTime="";
+      btn.classList.remove("active");
+    } else {
+      document.querySelectorAll("[data-time]").forEach(b=>b.classList.remove("active"));
+      recipeFilterTime=val;
+      btn.classList.add("active");
+    }
+    renderRecipes();
+  });
+});
+
+document.querySelectorAll("[data-status]").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    const val=btn.dataset.status;
+    if(recipeFilterStatus===val){
+      recipeFilterStatus="";
+      btn.classList.remove("active");
+    } else {
+      document.querySelectorAll("[data-status]").forEach(b=>b.classList.remove("active"));
+      recipeFilterStatus=val;
+      btn.classList.add("active");
+    }
+    renderRecipes();
+  });
 });
 
 document.getElementById("menu-week").addEventListener("click",e=>{
