@@ -335,24 +335,18 @@ html,body{
 
 /* LISTA */
 .list-section{background:var(--off-white);border-radius:var(--r-md);padding:28px;border:1.5px solid var(--rule);margin-bottom:18px;box-shadow:var(--shadow-1)}
-.list-section.is-priority{background:var(--black);color:var(--off-white);border-color:var(--black)}
-.list-section.is-priority .list-section-title{color:var(--off-white)}
-.list-section.is-priority .list-item{border-color:rgba(255,252,244,0.14);color:var(--off-white)}
-.list-section.is-priority .list-item-qty{color:var(--lime)}
+.list-section.is-priority{border-color:var(--black);border-top:4px solid var(--lime)}
 .list-section-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px;gap:14px;flex-wrap:wrap}
 .list-section-title{font-family:var(--font-display);font-weight:900;font-size:24px;letter-spacing:-0.02em;line-height:1}
 .list-section-sub{font-family:var(--font-italic);font-style:italic;font-size:15px;color:var(--black-60);margin-top:4px}
-.list-section.is-priority .list-section-sub{color:rgba(255,252,244,0.7)}
 .list-section-count{font-family:var(--font-display);font-weight:900;font-size:32px;letter-spacing:-0.02em;color:var(--pink);line-height:1}
 .list-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
 .list-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px solid var(--rule);border-radius:var(--r-sm);font-size:14px;cursor:pointer;transition:background var(--dur)}
-.list-item:hover{background:rgba(15,15,15,0.04)}
-.list-section.is-priority .list-item:hover{background:rgba(255,252,244,0.06)}
+.list-item:hover{background:var(--black-06)}
 .list-item.checked{opacity:0.5;text-decoration:line-through}
 .list-checkbox{width:18px;height:18px;border:1.5px solid currentColor;border-radius:4px;flex-shrink:0;display:grid;place-items:center;font-size:12px;font-weight:900}
 .list-item.checked .list-checkbox{background:currentColor}
 .list-item.checked .list-checkbox::after{content:"✓";color:var(--off-white);font-size:11px}
-.list-section.is-priority .list-item.checked .list-checkbox::after{color:var(--black)}
 .list-item-name{flex:1;font-weight:700}
 .list-item-qty{font-family:var(--font-italic);font-style:italic;font-size:13px;color:var(--black-60)}
 
@@ -1059,9 +1053,9 @@ function renderList(){
   root.innerHTML="";
 
   // ── Helper: renderiza um bloco de itens agrupados por categoria ──
-  function renderBlock({title, sub, items, dark, countColor}){
+  function renderBlock({title, sub, items, countColor}){
     const section=document.createElement("div");
-    section.className="list-section"+(dark?" is-priority":"");
+    section.className="list-section is-priority";
 
     // Agrupa por categoria
     const byCat={};
@@ -1087,7 +1081,7 @@ function renderList(){
     if(items.length===0){
       const empty=document.createElement("div");
       empty.className="italic";
-      empty.style.cssText=`color:${dark?"rgba(255,252,244,0.6)":"var(--black-60)"};padding:16px 0`;
+      empty.style.cssText=`color:var(--black-60);padding:16px 0`;
       empty.textContent=title.includes("receita")
         ?(week.flat().filter(x=>x).length===0?"Adicione refeições ao cardápio para gerar a lista.":"Você já tem tudo. Pode cozinhar.")
         :"Tudo em ordem por aqui.";
@@ -1100,14 +1094,13 @@ function renderList(){
     for(const cat of cats){
       const catItems=byCat[cat];
 
-      // Label da categoria
       const catLabel=document.createElement("div");
       catLabel.style.cssText=`
         font-family:var(--font-display);font-weight:900;
         font-size:11px;letter-spacing:0.08em;text-transform:uppercase;
-        color:${dark?"rgba(255,252,244,0.5)":"var(--black-40)"};
+        color:var(--black-40);
         padding:14px 0 6px;
-        border-top:1px solid ${dark?"rgba(255,252,244,0.1)":"var(--rule)"};
+        border-top:1px solid var(--rule);
         margin-top:4px;
       `;
       catLabel.textContent=cat;
@@ -1118,17 +1111,17 @@ function renderList(){
       section.appendChild(grid);
 
       for(const item of catItems){
-        const prefix=dark?"prio":"rec";
+        const prefix=isPriority?"prio":"rec";
         const key=`${prefix}-${item.name}`;
         const row=document.createElement("div");
         row.className=`list-item ${checkedItems.has(key)?"checked":""}`;
         row.dataset.key=key;
 
         let badgeHtml="";
-        if(dark && item.reason){
+        if(isPriority && item.reason){
           const reasonLabel=item.reason==="essential"?"Essencial":item.reason==="zero"?"Zerado":"Baixo";
-          const reasonBg=item.reason==="essential"?"var(--lime)":item.reason==="zero"?"var(--pink)":"rgba(255,252,244,0.25)";
-          const reasonFg=item.reason==="essential"?"var(--black)":"var(--off-white)";
+          const reasonBg=item.reason==="essential"?"var(--lime)":item.reason==="zero"?"var(--pink)":"var(--black-12)";
+          const reasonFg=item.reason==="essential"?"var(--black)":"var(--black)";
           badgeHtml=`<span style="padding:2px 8px;border-radius:999px;font-size:8px;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;background:${reasonBg};color:${reasonFg};flex-shrink:0">${reasonLabel}</span>`;
         }
 
@@ -1146,16 +1139,16 @@ function renderList(){
   }
 
   // ── Bloco 1: Lista padrão da casa ────────────────────────────
+  let isPriority=true;
   renderBlock({
     title:"Lista padrão da casa",
     sub:"Itens essenciais que estão em falta ou abaixo do mínimo.",
     items:priorityList,
-    dark:true,
-    countColor:"var(--lime)"
+    countColor:"var(--black)"
   });
 
   // ── Bloco 2: Receitas da semana ───────────────────────────────
-  // Enriquecer recipeList com categoria (busca na despensa ou fallback)
+  isPriority=false;
   const enriched=recipeList.map(item=>{
     const inP=findInPantry(item.name);
     return {...item, category: inP?inP.category:"Outros"};
@@ -1165,7 +1158,6 @@ function renderList(){
     title:"Para as receitas da semana",
     sub:"O que falta para fazer o que você planejou.",
     items:enriched,
-    dark:false,
     countColor:null
   });
 
