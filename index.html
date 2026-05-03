@@ -340,15 +340,48 @@ html,body{
 .list-section-title{font-family:var(--font-display);font-weight:900;font-size:24px;letter-spacing:-0.02em;line-height:1}
 .list-section-sub{font-family:var(--font-italic);font-style:italic;font-size:15px;color:var(--black-60);margin-top:4px}
 .list-section-count{font-family:var(--font-display);font-weight:900;font-size:32px;letter-spacing:-0.02em;color:var(--pink);line-height:1}
-.list-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
-.list-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px solid var(--rule);border-radius:var(--r-sm);font-size:14px;cursor:pointer;transition:background var(--dur)}
+
+/* Grid de categorias — 3 colunas no desktop, 2 no tablet, 1 no mobile */
+.list-cats-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:0 24px;
+}
+@media(max-width:900px){.list-cats-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.list-cats-grid{grid-template-columns:1fr}}
+
+/* Cada bloco de categoria */
+.list-cat-block{padding:4px 0 12px}
+.list-cat-label{
+  font-family:var(--font-display);font-weight:900;
+  font-size:10px;letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--black-40);
+  padding:12px 0 6px;
+  border-bottom:1.5px solid var(--rule);
+  margin-bottom:6px;
+}
+
+/* Cada linha de item — layout simples, vertical */
+.list-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 0;
+  border-bottom:1px solid var(--rule);
+  font-size:14px;cursor:pointer;
+  transition:background var(--dur);
+}
+.list-item:last-child{border-bottom:none}
 .list-item:hover{background:var(--black-06)}
-.list-item.checked{opacity:0.5;text-decoration:line-through}
-.list-checkbox{width:18px;height:18px;border:1.5px solid currentColor;border-radius:4px;flex-shrink:0;display:grid;place-items:center;font-size:12px;font-weight:900}
-.list-item.checked .list-checkbox{background:currentColor}
-.list-item.checked .list-checkbox::after{content:"✓";color:var(--off-white);font-size:11px}
-.list-item-name{flex:1;font-weight:700}
-.list-item-qty{font-family:var(--font-italic);font-style:italic;font-size:13px;color:var(--black-60)}
+.list-item.checked{opacity:0.45;text-decoration:line-through}
+.list-checkbox{
+  width:16px;height:16px;border:1.5px solid var(--black-40);
+  border-radius:3px;flex-shrink:0;display:grid;place-items:center;
+  font-size:10px;font-weight:900;transition:background var(--dur),border-color var(--dur);
+}
+.list-item.checked .list-checkbox{background:var(--black);border-color:var(--black)}
+.list-item.checked .list-checkbox::after{content:"✓";color:var(--off-white);font-size:9px}
+.list-item-name{flex:1;font-weight:700;font-size:14px}
+.list-item-qty{font-family:var(--font-italic);font-style:italic;font-size:12px;color:var(--black-60);white-space:nowrap}
+.list-item-badge{padding:1px 7px;border-radius:999px;font-size:8px;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;flex-shrink:0}
 
 .empty-state{text-align:center;padding:64px 24px;border:1.5px dashed var(--black-40);border-radius:var(--r-md)}
 .empty-state h3{font-family:var(--font-display);font-weight:900;font-size:24px;letter-spacing:-0.02em;margin-bottom:8px}
@@ -1083,29 +1116,19 @@ function renderList(){
       return;
     }
 
-    // Itens agrupados por categoria
+    // Itens agrupados por categoria — grid de colunas
+    const catsGrid=document.createElement("div");
+    catsGrid.className="list-cats-grid";
+
     for(const cat of cats){
       const catItems=byCat[cat];
+      const block=document.createElement("div");
+      block.className="list-cat-block";
 
-      // Separador de categoria
       const catLabel=document.createElement("div");
-      catLabel.style.cssText=[
-        "font-family:var(--font-display)",
-        "font-weight:900",
-        "font-size:11px",
-        "letter-spacing:0.08em",
-        "text-transform:uppercase",
-        "color:var(--black-40)",
-        "padding:14px 0 6px",
-        "border-top:1px solid var(--rule)",
-        "margin-top:4px"
-      ].join(";");
+      catLabel.className="list-cat-label";
       catLabel.textContent=cat;
-      section.appendChild(catLabel);
-
-      const grid=document.createElement("div");
-      grid.className="list-items";
-      section.appendChild(grid);
+      block.appendChild(catLabel);
 
       for(const item of catItems){
         const key=(isPriority?"prio":"rec")+"-"+item.name;
@@ -1117,7 +1140,7 @@ function renderList(){
         if(isPriority && item.reason){
           const label=item.reason==="essential"?"Essencial":item.reason==="zero"?"Zerado":"Baixo";
           const bg=item.reason==="essential"?"var(--lime)":item.reason==="zero"?"var(--pink)":"var(--black-12)";
-          badge=`<span style="padding:2px 8px;border-radius:999px;font-size:8px;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;background:${bg};color:var(--black);flex-shrink:0">${label}</span>`;
+          badge=`<span class="list-item-badge" style="background:${bg};color:var(--black)">${label}</span>`;
         }
 
         row.innerHTML=`
@@ -1126,11 +1149,11 @@ function renderList(){
           <div class="list-item-qty">${fmtQty(item.qty)} ${item.unit}</div>
           ${badge}
         `;
-        grid.appendChild(row);
+        block.appendChild(row);
       }
+      catsGrid.appendChild(block);
     }
-
-    root.appendChild(section);
+    section.appendChild(catsGrid);
   }
 
   // Bloco 1 — Casa & Essenciais
