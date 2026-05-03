@@ -995,28 +995,8 @@ function renderPickerList(q){
     return a.name.localeCompare(b.name,"pt-BR");
   });
 
-  // Se tem texto mas nenhum match, mostra opção de salvar texto livre
   if(list.length===0){
-    if(q.trim()){
-      const freeItem=document.createElement("div");
-      freeItem.className="picker-item";
-      freeItem.innerHTML=`
-        <div class="picker-badge" style="background:var(--lime);color:var(--black);font-size:14px">+</div>
-        <div class="picker-item-name">Salvar "<strong>${q.trim()}</strong>"</div>
-        <div class="picker-item-meta">texto livre</div>
-      `;
-      freeItem.addEventListener("click",()=>{
-        if(pickerDay!==null){
-          week[pickerDay][pickerMeal]=q.trim();
-          if(dbReady) saveCardapioSlot(pickerDay, pickerMeal, q.trim());
-        }
-        closePicker();
-        renderAll();
-      });
-      root.appendChild(freeItem);
-    } else {
-      root.innerHTML=`<div class="picker-empty">Nenhuma receita encontrada.</div>`;
-    }
+    root.innerHTML=`<div class="picker-empty">Nenhuma receita encontrada.</div>`;
     return;
   }
 
