@@ -548,7 +548,7 @@ html,body{
     <div class="section-head">
       <div>
         <h2 class="section-title">Receitas</h2>
-        <p class="section-sub">30 pratos brasileiros. Cada um cruzado com o que você tem.</p>
+        <p class="section-sub" id="recipes-sub">Carregando receitas…</p>
       </div>
     </div>
     <div class="recipe-toolbar">
@@ -951,8 +951,10 @@ function isLowStock(item){return item.qty<=1;}
 function fmtQty(q){return q.toFixed(q%1===0?0:1).replace(".",",");}
 
 function recipeStatus(recipe){
-  let have=0, total=recipe.ingredients.length;
-  for(const ing of recipe.ingredients){
+  const ingredients = recipe.ingredients || [];
+  if(ingredients.length === 0) return {status:"missing",have:0,total:0,ratio:0};
+  let have=0, total=ingredients.length;
+  for(const ing of ingredients){
     const inP=findInPantry(ing.name);
     if(inP && inP.qty>=ing.qty) have++;
   }
@@ -1064,6 +1066,8 @@ function renderRecipes(){
 
   if(visible.length===0){
     grid.innerHTML=`<div class="empty-state"><h3>Nenhuma receita encontrada.</h3><p>Tente outro filtro ou termo de busca.</p></div>`;
+    const subEl=document.getElementById("recipes-sub");
+    if(subEl) subEl.textContent=`${recipes.length} receitas no catálogo. Cada uma cruzada com o que você tem.`;
     document.getElementById("count-recipes").textContent=recipes.filter(r=>recipeStatus(r).status==="ready").length;
     return;
   }
@@ -1111,10 +1115,9 @@ function renderRecipes(){
     }
   }
 
+  const subEl=document.getElementById("recipes-sub");
+  if(subEl) subEl.textContent=`${recipes.length} receitas no catálogo. Cada uma cruzada com o que você tem.`;
   document.getElementById("count-recipes").textContent=recipes.filter(r=>recipeStatus(r).status==="ready").length;
-}
-
-function renderRecipeCards(container, list){
   for(const r of list){
     const card=document.createElement("div");
     card.className=`recipe-card status-${r.status}`;
