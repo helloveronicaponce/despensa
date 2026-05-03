@@ -668,6 +668,31 @@ async function deletePantryItem(name){
   await sb.from("cozinha_despensa").delete().eq("name", name);
 }
 
+async function ensureIngredientesNaDespensa(recipeName){
+  // Busca a receita pelo nome
+  const recipe = recipes.find(r=>r.name.toLowerCase()===recipeName.toLowerCase());
+  if(!recipe) return;
+
+  const novos = [];
+  for(const ing of recipe.ingredients){
+    const inP = findInPantry(ing.name);
+    if(!inP){
+      // Não existe na despensa — cria com qty 0
+      const novoItem = {name: ing.name, qty: 0, unit: ing.unit, category: "Outros"};
+      pantry.push(novoItem);
+      novos.push(novoItem);
+    }
+  }
+
+  // Salva os novos no Supabase
+  if(novos.length > 0 && dbReady){
+    for(const item of novos){
+      await savePantryItem(item);
+    }
+    renderPantry(); // atualiza despensa
+  }
+}
+
 // ── CARDÁPIO ─────────────────────────────────────────────────
 
 async function loadCardapio(){
@@ -996,6 +1021,7 @@ function renderPickerList(q){
       if(pickerDay!==null){
         week[pickerDay][pickerMeal]=r.name;
         if(dbReady) saveCardapioSlot(pickerDay, pickerMeal, r.name);
+        ensureIngredientesNaDespensa(r.name);
       }
       closePicker();
       renderAll();
@@ -1046,8 +1072,13 @@ function buildUnifiedList(){
     }
   }
 
-  // 3. Ingredientes faltando para as receitas do cardápio
-  // Compara presença (qty > 0) — não quantidade exata, pois unidades podem diferir
+  // 3. Ingredientes das receitas do cardápio
+  // Regras:
+  // - Não tem na despensa → falta, entra com tag Semana
+  // - Tem com qty = 0 → falta, entra com tag Semana
+  // - Tem mas unidade diferente da receita → incerto, entra com tag Semana
+  // - Tem com mesma unidade e qty suficiente → ok, não entra
+  // - Tem com mesma unidade e qty insuficiente → falta, entra com tag Semana
   for(let i=0;i<7;i++){
     for(let m=0;m<4;m++){
       const recipeName = week[i][m];
@@ -1056,15 +1087,24 @@ function buildUnifiedList(){
       if(!recipe) continue;
       for(const ing of recipe.ingredients){
         const inP = findInPantry(ing.name);
-        const temNaDespensa = inP && inP.qty > 0;
-        if(!temNaDespensa){
-          // Não tem na despensa — adiciona à lista com tag Semana
-          const category = inP ? inP.category : "Outros";
-          add(ing.name, ing.qty, ing.unit, category, "Semana");
+        let precisaComprar = false;
+
+        if(!inP || inP.qty <= 0){
+          // Não tem ou zerado
+          precisaComprar = true;
+        } else if(inP.unit !== ing.unit){
+          // Unidade diferente — não dá pra comparar, conservador: marca como necessário
+          precisaComprar = true;
+        } else if(inP.qty < ing.qty){
+          // Mesma unidade mas quantidade insuficiente
+          precisaComprar = true;
         }
-        // Se tem mas está baixo (qty <= 1), já foi pego na etapa 2 — adiciona só a tag Semana
-        if(inP && inP.qty > 0 && inP.qty <= 1){
-          add(ing.name, inP.qty, inP.unit, inP.category, "Semana");
+
+        if(precisaComprar){
+          const category = inP ? inP.category : "Outros";
+          // Usa a unidade da despensa se existir, senão da receita
+          const unit = inP ? inP.unit : ing.unit;
+          add(ing.name, ing.qty, unit, category, "Semana");
         }
       }
     }
@@ -1222,6 +1262,7 @@ document.getElementById("add-week-btn").addEventListener("click",()=>{
     }
   }
   if(!found){alert("Cardápio cheio. Limpe um slot primeiro.");return;}
+  ensureIngredientesNaDespensa(modalRecipeId);
   closeModal();
   switchTab("week");
 });
