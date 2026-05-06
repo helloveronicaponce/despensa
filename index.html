@@ -550,6 +550,7 @@ html,body{
         <h2 class="section-title">Receitas</h2>
         <p class="section-sub" id="recipes-sub">Carregando receitas…</p>
       </div>
+      <button class="btn is-lime is-sm" id="new-recipe-btn">+ Nova receita</button>
     </div>
     <div class="recipe-toolbar">
       <div class="recipe-toolbar-top">
@@ -684,7 +685,7 @@ html,body{
 <div class="edit-overlay" id="edit-overlay">
   <div class="edit-modal">
     <div class="edit-modal-header">
-      <div class="edit-modal-title">Editar receita</div>
+      <div class="edit-modal-title" id="edit-modal-title">Editar receita</div>
       <button class="modal-close" id="edit-close">✕</button>
     </div>
     <div class="edit-modal-body">
@@ -1719,6 +1720,7 @@ function openEditModal(recipeId){
   const r = recipes.find(x=>x.id===recipeId);
   if(!r) return;
   editingRecipeId = recipeId;
+  document.getElementById("edit-modal-title").textContent = "Editar receita";
 
   document.getElementById("edit-name").value = r.name;
   document.getElementById("edit-time").value = r.time;
@@ -1755,14 +1757,25 @@ function makeIngRow(name="", qty="", unit="un"){
   return row;
 }
 
+function openNewRecipeModal(){
+  editingRecipeId = null;
+  document.getElementById("edit-modal-title").textContent = "Nova receita";
+  document.getElementById("edit-name").value = "";
+  document.getElementById("edit-time").value = "";
+  document.getElementById("edit-serves").value = "4";
+  document.getElementById("edit-category").value = "Outros";
+  renderEditIngredients([]);
+  document.getElementById("edit-steps").value = "";
+  document.getElementById("edit-overlay").classList.add("open");
+  setTimeout(()=>document.getElementById("edit-name").focus(), 50);
+}
+
 function closeEditModal(){
   document.getElementById("edit-overlay").classList.remove("open");
   editingRecipeId=null;
 }
 
 async function saveEditedRecipe(){
-  if(!editingRecipeId) return;
-
   const name = document.getElementById("edit-name").value.trim();
   const time = document.getElementById("edit-time").value.trim();
   const serves = parseInt(document.getElementById("edit-serves").value)||1;
@@ -1783,28 +1796,62 @@ async function saveEditedRecipe(){
   if(!name){ alert("Nome obrigatório."); return; }
 
   const btn = document.getElementById("edit-save");
-  btn.textContent="Salvando…";
-  btn.disabled=true;
+  const isCreating = (editingRecipeId === null);
+  btn.textContent = isCreating ? "Criando…" : "Salvando…";
+  btn.disabled = true;
 
-  const {error} = await sb.from("cozinha_receitas").update({
-    name, time_min:time, serves, category, ingredients, steps
-  }).eq("id", editingRecipeId);
+  if(isCreating){
+    // INSERT — nova receita
+    const {data, error} = await sb.from("cozinha_receitas").insert({
+      name, time_min: time, serves, category, ingredients, steps, meal_type: "main"
+    }).select().single();
 
-  if(error){
-    alert("Erro ao salvar: "+error.message);
-    btn.textContent="Salvar receita";
-    btn.disabled=false;
-    return;
+    if(error){
+      alert("Erro ao criar: "+error.message);
+      btn.textContent="Salvar receita";
+      btn.disabled=false;
+      return;
+    }
+
+    // Adiciona na lista local
+    recipes.push({
+      id: data.id,
+      name,
+      time: data.time_min,
+      serves: data.serves,
+      category: data.category||"Outros",
+      mealType: "main",
+      ingredients: Array.isArray(data.ingredients) ? data.ingredients.filter(i=>i&&i.name) : [],
+      steps: Array.isArray(data.steps) ? data.steps : []
+    });
+
+    closeEditModal();
+    renderAll();
+    showToast("Receita criada ✓");
+
+  } else {
+    // UPDATE — editar receita existente
+    const {error} = await sb.from("cozinha_receitas").update({
+      name, time_min:time, serves, category, ingredients, steps
+    }).eq("id", editingRecipeId);
+
+    if(error){
+      alert("Erro ao salvar: "+error.message);
+      btn.textContent="Salvar receita";
+      btn.disabled=false;
+      return;
+    }
+
+    const idx = recipes.findIndex(r=>r.id===editingRecipeId);
+    if(idx>=0){
+      recipes[idx] = {...recipes[idx], name, time, serves, category, ingredients, steps};
+    }
+
+    closeEditModal();
+    renderAll();
+    showToast("Receita salva ✓");
   }
 
-  const idx = recipes.findIndex(r=>r.id===editingRecipeId);
-  if(idx>=0){
-    recipes[idx] = {...recipes[idx], name, time, serves, category, ingredients, steps};
-  }
-
-  closeEditModal();
-  renderAll();
-  showToast("Receita salva ✓");
   btn.textContent="Salvar receita";
   btn.disabled=false;
 }
@@ -1974,6 +2021,9 @@ document.getElementById("copy-list").addEventListener("click",copyList);
 if("serviceWorker" in navigator){
   navigator.serviceWorker.register("./sw.js").catch(()=>{});
 }
+
+// Botão "Nova receita"
+document.getElementById("new-recipe-btn").addEventListener("click", openNewRecipeModal);
 
 // Boot — carrega dados do Supabase
 loadFromDB();
