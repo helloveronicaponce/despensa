@@ -1410,6 +1410,14 @@ function buildUnifiedList(){
             const unit = inP ? inP.unit : ing.unit;
             add(ing.name, ing.qty, unit, category, "Semana", "semana");
             _dbgIngAdded++;
+          } else {
+            // Tem estoque suficiente — mas se o item já está na lista (baixo/essencial),
+            // marca com tag Semana para indicar que é usado no cardápio desta semana
+            const ingKey = ing.name.toLowerCase();
+            if(map[ingKey]){
+              map[ingKey].tags.add("Semana");
+              map[ingKey].sources.add("semana");
+            }
           }
         }
       }
