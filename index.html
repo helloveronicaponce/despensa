@@ -1416,6 +1416,7 @@ function buildUnifiedList(){
     }
   }
   console.log(`[despensa] cardápio: ${_dbgWeekTotal} pratos no week, ${_dbgReceitasFound} com receita cadastrada, ${_dbgIngAdded} ingredientes adicionados à lista`);
+
   const TAG_ORDER = ["Essencial","Zerado","Baixo","Semana"];
   return Object.values(map).map(item=>({
     ...item,
@@ -1553,7 +1554,7 @@ function renderList(){
     root.appendChild(info);
   }
 
-    // Seção de itens excluídos (se showExcluded)
+  // Seção de itens excluídos (se showExcluded)
   if(showExcluded && excluded.length>0){
     const excSection=document.createElement("div");
     excSection.className="list-excluded-section";
@@ -1706,7 +1707,7 @@ document.getElementById("pantry-list-root").addEventListener("click",e=>{
       const raw=parseFloat(input.value.replace(",","."));
       if(!isNaN(raw) && raw>=0){
         item.qty=Math.round(raw*10)/10;
-        if(dbReady) savePantryItem(item);
+            if(dbReady) savePantryItem(item);
       }
       renderAll();
     };
