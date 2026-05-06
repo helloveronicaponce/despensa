@@ -472,6 +472,49 @@ html,body{
 
 .placeholder{padding:64px 24px;border:1.5px dashed var(--black-40);border-radius:var(--r-md);text-align:center;font-family:var(--font-italic);font-style:italic;color:var(--black-60)}
 
+
+/* LISTA — filtros por fonte e controles de exclusão */
+.list-toolbar{display:flex;gap:8px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
+.list-filter-pill{
+  padding:7px 14px;border-radius:var(--r-pill);
+  border:1.5px solid var(--black-40);background:transparent;
+  cursor:pointer;font-family:var(--font-body);font-weight:700;
+  font-size:11px;letter-spacing:0.06em;text-transform:uppercase;
+  color:var(--black-60);transition:background var(--dur),color var(--dur),border-color var(--dur);
+}
+.list-filter-pill.active{background:var(--black);color:var(--off-white);border-color:var(--black)}
+.list-filter-pill:hover:not(.active){background:var(--black-12);border-color:var(--black);color:var(--black)}
+.list-filter-pill.active.is-essenciais{background:#3d7fff;border-color:#3d7fff}
+.list-filter-pill.active.is-baixo{background:var(--pink);border-color:var(--pink)}
+.list-filter-pill.active.is-semana{background:var(--lime);color:var(--black);border-color:var(--lime)}
+.list-hidden-note{
+  font-family:var(--font-italic);font-style:italic;
+  color:var(--black-60);font-size:13px;margin-left:auto;
+  cursor:pointer;border-bottom:1px dashed currentColor;white-space:nowrap;
+}
+.list-hidden-note:hover{color:var(--black)}
+.list-item-exclude{
+  width:22px;height:22px;border:0;background:transparent;
+  color:var(--black-12);cursor:pointer;display:grid;
+  place-items:center;border-radius:4px;font-size:11px;flex-shrink:0;
+  transition:background var(--dur),color var(--dur);
+}
+.list-item-exclude:hover{background:var(--pink);color:var(--off-white)}
+.list-excluded-section{margin-top:24px;padding-top:20px;border-top:1.5px dashed var(--rule)}
+.list-excluded-title{
+  font-family:var(--font-body);font-weight:700;font-size:10px;
+  letter-spacing:0.1em;text-transform:uppercase;color:var(--black-40);
+  margin-bottom:10px;
+}
+.list-item.is-excluded{opacity:0.45}
+.list-item-restore{
+  width:22px;height:22px;border:0;background:transparent;
+  color:var(--black-40);cursor:pointer;display:grid;
+  place-items:center;border-radius:4px;font-size:14px;flex-shrink:0;
+  transition:background var(--dur),color var(--dur);
+}
+.list-item-restore:hover{background:var(--lime);color:var(--black)}
+
 .hidden{display:none !important}
 
 /* Toast de confirmação */
@@ -622,7 +665,13 @@ html,body{
       </div>
       <button class="btn is-lime is-sm" id="copy-list">📋 Copiar para WhatsApp</button>
     </div>
-    <div id="list-content"></div>
+    <div class="list-toolbar">
+    <button class="list-filter-pill active is-essenciais" data-source="essenciais">🏠 Essenciais</button>
+    <button class="list-filter-pill active is-baixo" data-source="baixo">📦 Estoque baixo</button>
+    <button class="list-filter-pill active is-semana" data-source="semana">📅 Cardápio</button>
+    <span class="list-hidden-note hidden" id="list-hidden-note"></span>
+  </div>
+  <div id="list-content"></div>
   </section>
 
   <section class="tab-panel hidden" id="panel-photo">
@@ -955,6 +1004,10 @@ let recipeFilterStatus=""; // "" | "ready" | "almost" | "missing"
 let recipeSearchQ="";
 let modalRecipeId=null;
 const checkedItems=new Set();
+let listSourceFilters={essenciais:true,baixo:true,semana:true};
+let excludedListItems=new Set(JSON.parse(localStorage.getItem('despensa_excluded')||'[]'));
+let showExcluded=false;
+function saveExcluded(){localStorage.setItem('despensa_excluded',JSON.stringify([...excludedListItems]));}
 
 function findInPantry(name){
   if(!name) return null;
@@ -1298,45 +1351,43 @@ function closePicker(){
 }
 
 function buildUnifiedList(){
-  // Mapa unificado: name -> {item, tags[]}
   const map = {};
 
-  // Helper para adicionar/atualizar item no mapa
-  function add(name, qty, unit, category, tag){
+  function add(name, qty, unit, category, tag, source){
     const key = name.toLowerCase();
     if(!map[key]){
-      map[key] = {name, qty, unit, category: category||"Outros", tags: new Set()};
+      map[key] = {name, qty, unit, category: category||"Outros", tags: new Set(), sources: new Set()};
     } else {
-      // Acumula quantidade se já existe
       map[key].qty = Math.max(map[key].qty, qty);
     }
     map[key].tags.add(tag);
+    if(source) map[key].sources.add(source);
   }
 
-  // 1. Lista padrão da casa — essenciais abaixo do mínimo
+  // 1. Essenciais da casa
   for(const std of STANDARD){
     const inP = findInPantry(std.name);
     if(!inP || inP.qty < std.qty){
       const falta = std.qty - (inP ? inP.qty : 0);
       const reason = !inP || inP.qty===0 ? "Zerado" : inP.qty<=1 ? "Baixo" : "Essencial";
-      add(std.name, falta, std.unit, std.category, reason);
+      add(std.name, falta, std.unit, std.category, reason, "essenciais");
     }
   }
 
-  // 2. Itens da despensa com estoque baixo (qty <= 1) que não são essenciais
+  // 2. Estoque baixo (não-essenciais)
   const essencialNames = new Set(STANDARD.map(s=>s.name.toLowerCase()));
   for(const item of pantry){
     if(essencialNames.has(item.name.toLowerCase())) continue;
     if(item.qty <= 1){
       const reason = item.qty === 0 ? "Zerado" : "Baixo";
-      add(item.name, Math.max(1, 2-item.qty), item.unit, item.category, reason);
+      add(item.name, Math.max(1, 2-item.qty), item.unit, item.category, reason, "baixo");
     }
   }
 
-  // 3. Ingredientes das receitas do cardápio
+  // 3. Ingredientes do cardápio
   for(let i=0;i<7;i++){
     for(let m=0;m<4;m++){
-      const names = week[i][m]; // array
+      const names = week[i][m];
       for(const recipeName of names){
         if(!recipeName) continue;
         const recipe = recipes.find(r=>r.name.toLowerCase()===recipeName.toLowerCase());
@@ -1350,88 +1401,134 @@ function buildUnifiedList(){
           if(precisaComprar){
             const category = inP ? inP.category : "Outros";
             const unit = inP ? inP.unit : ing.unit;
-            add(ing.name, ing.qty, unit, category, "Semana");
+            add(ing.name, ing.qty, unit, category, "Semana", "semana");
           }
         }
       }
     }
   }
 
-  // Converte para array com tags como array ordenado
   const TAG_ORDER = ["Essencial","Zerado","Baixo","Semana"];
   return Object.values(map).map(item=>({
     ...item,
-    tags: TAG_ORDER.filter(t=>item.tags.has(t))
+    tags: TAG_ORDER.filter(t=>item.tags.has(t)),
+    sources: [...item.sources]
   })).sort((a,b)=>a.name.localeCompare(b.name,"pt-BR"));
 }
 
 function buildList(){ return []; } // mantido por compatibilidade
 function buildPriorityList(){ return []; } // substituído por buildUnifiedList
-function renderList(){
-  const root=document.getElementById("list-content");
-  root.innerHTML="";
-  const items = buildUnifiedList();
+const TAG_STYLE_LIST={
+  "Essencial":{bg:"#e8f0ff",color:"#3d7fff"},
+  "Zerado":{bg:"var(--pink)",color:"var(--off-white)"},
+  "Baixo":{bg:"var(--black-12)",color:"var(--black)"},
+  "Semana":{bg:"var(--lime)",color:"var(--black)"}
+};
 
-  document.getElementById("count-list").textContent=items.length;
+function buildListItemRow(item, isExcluded){
+  const key="u-"+item.name;
+  const row=document.createElement("div");
+  row.className="list-item"+(checkedItems.has(key)?" checked":"")+(isExcluded?" is-excluded":"");
+  row.dataset.key=key;
 
-  if(items.length===0){
-    root.innerHTML=`<div class="empty-state"><h3>Tudo em ordem!</h3><p>Sua despensa está abastecida e o cardápio está coberto.</p></div>`;
-    return;
+  const badges=item.tags.map(t=>{
+    const s=TAG_STYLE_LIST[t]||{bg:"var(--black-12)",color:"var(--black)"};
+    return `<span class="list-item-badge" style="background:${s.bg};color:${s.color}">${t}</span>`;
+  }).join("");
+
+  if(isExcluded){
+    row.innerHTML=`
+      <div class="list-item-name" style="flex:1">${item.name}</div>
+      <div class="list-item-qty">${fmtQty(item.qty)} ${item.unit}</div>
+      ${badges}
+      <button class="list-item-restore" data-action="restore-item" data-name="${item.name}" title="Incluir novamente">+</button>
+    `;
+  } else {
+    row.innerHTML=`
+      <div class="list-checkbox"></div>
+      <div class="list-item-name">${item.name}</div>
+      <div class="list-item-qty">${fmtQty(item.qty)} ${item.unit}</div>
+      ${badges}
+      <button class="list-item-exclude" data-action="exclude-item" data-name="${item.name}" title="Remover da lista">✕</button>
+    `;
   }
+  return row;
+}
 
-  // Agrupa por categoria
+function renderCatsGrid(items, isExcluded){
+  const grid=document.createElement("div");
+  grid.className="list-cats-grid";
   const byCat={};
   for(const item of items){
     const cat=item.category||"Outros";
     if(!byCat[cat]) byCat[cat]=[];
     byCat[cat].push(item);
   }
-  const cats = CATEGORIES.filter(c=>byCat[c]);
-
-  const section=document.createElement("div");
-  section.className="list-section";
-
-  const catsGrid=document.createElement("div");
-  catsGrid.className="list-cats-grid";
-
-  const TAG_STYLE={
-    "Essencial":{bg:"var(--lime)",color:"var(--black)"},
-    "Zerado":{bg:"var(--pink)",color:"var(--off-white)"},
-    "Baixo":{bg:"var(--black-12)",color:"var(--black)"},
-    "Semana":{bg:"var(--black)",color:"var(--off-white)"}
-  };
-
-  for(const cat of cats){
+  for(const cat of CATEGORIES.filter(c=>byCat[c])){
     const block=document.createElement("div");
     block.className="list-cat-block";
-    const catLabel=document.createElement("div");
-    catLabel.className="list-cat-label";
-    catLabel.textContent=cat;
-    block.appendChild(catLabel);
-
-    for(const item of byCat[cat]){
-      const key="u-"+item.name;
-      const row=document.createElement("div");
-      row.className="list-item"+(checkedItems.has(key)?" checked":"");
-      row.dataset.key=key;
-
-      const badges=item.tags.map(t=>{
-        const s=TAG_STYLE[t]||{bg:"var(--black-12)",color:"var(--black)"};
-        return `<span class="list-item-badge" style="background:${s.bg};color:${s.color}">${t}</span>`;
-      }).join("");
-
-      row.innerHTML=`
-        <div class="list-checkbox"></div>
-        <div class="list-item-name">${item.name}</div>
-        <div class="list-item-qty">${fmtQty(item.qty)} ${item.unit}</div>
-        ${badges}
-      `;
-      block.appendChild(row);
-    }
-    catsGrid.appendChild(block);
+    const lbl=document.createElement("div");
+    lbl.className="list-cat-label";
+    lbl.textContent=cat;
+    block.appendChild(lbl);
+    for(const item of byCat[cat]) block.appendChild(buildListItemRow(item,isExcluded));
+    grid.appendChild(block);
   }
-  section.appendChild(catsGrid);
-  root.appendChild(section);
+  return grid;
+}
+
+function renderList(){
+  const root=document.getElementById("list-content");
+  root.innerHTML="";
+
+  const allItems=buildUnifiedList();
+
+  // Filtrar por fonte ativa
+  const sourceFiltered=allItems.filter(item=>
+    item.sources.some(s=>listSourceFilters[s])
+  );
+
+  // Separar incluídos e excluídos
+  const included=sourceFiltered.filter(item=>!excludedListItems.has(item.name.toLowerCase()));
+  const excluded=sourceFiltered.filter(item=>excludedListItems.has(item.name.toLowerCase()));
+
+  document.getElementById("count-list").textContent=included.length;
+
+  // Atualizar nota de ocultos
+  const note=document.getElementById("list-hidden-note");
+  if(excluded.length>0){
+    note.classList.remove("hidden");
+    note.textContent=`${excluded.length} oculto${excluded.length!==1?"s":""} · ${showExcluded?"Ocultar":"Mostrar"}`;
+  } else {
+    note.classList.add("hidden");
+    showExcluded=false;
+  }
+
+  if(included.length===0 && excluded.length===0){
+    root.innerHTML=`<div class="empty-state"><h3>Tudo em ordem!</h3><p>Sua despensa está abastecida e o cardápio está coberto.</p></div>`;
+    return;
+  }
+
+  if(included.length===0){
+    root.innerHTML=`<div class="empty-state"><h3>Todos os itens estão ocultos.</h3><p>Clique em "${excluded.length} ocultos · Mostrar" acima para vê-los.</p></div>`;
+  } else {
+    const section=document.createElement("div");
+    section.className="list-section";
+    section.appendChild(renderCatsGrid(included, false));
+    root.appendChild(section);
+  }
+
+  // Seção de itens excluídos (se showExcluded)
+  if(showExcluded && excluded.length>0){
+    const excSection=document.createElement("div");
+    excSection.className="list-excluded-section";
+    const title=document.createElement("div");
+    title.className="list-excluded-title";
+    title.textContent="Itens ocultos da lista";
+    excSection.appendChild(title);
+    excSection.appendChild(renderCatsGrid(excluded, true));
+    root.appendChild(excSection);
+  }
 }
 
 function openModal(recipeId){
@@ -1703,12 +1800,47 @@ document.getElementById("clear-week").addEventListener("click",()=>{
 });
 
 document.getElementById("list-content").addEventListener("click",e=>{
+  // Excluir item
+  const excludeBtn=e.target.closest("[data-action='exclude-item']");
+  if(excludeBtn){
+    excludedListItems.add(excludeBtn.dataset.name.toLowerCase());
+    saveExcluded();
+    renderList();
+    showToast(`"${excludeBtn.dataset.name}" removido da lista`);
+    return;
+  }
+  // Restaurar item
+  const restoreBtn=e.target.closest("[data-action='restore-item']");
+  if(restoreBtn){
+    excludedListItems.delete(restoreBtn.dataset.name.toLowerCase());
+    saveExcluded();
+    renderList();
+    showToast(`"${restoreBtn.dataset.name}" incluído novamente`);
+    return;
+  }
+  // Check/uncheck ao comprar
   const item=e.target.closest(".list-item");
   if(!item) return;
   const key=item.dataset.key;
   if(checkedItems.has(key)) checkedItems.delete(key);
   else checkedItems.add(key);
   item.classList.toggle("checked");
+});
+
+// Filtros por fonte
+document.querySelectorAll(".list-filter-pill[data-source]").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    const src=btn.dataset.source;
+    listSourceFilters[src]=!listSourceFilters[src];
+    btn.classList.toggle("active", listSourceFilters[src]);
+    renderList();
+  });
+});
+
+// Toggle mostrar/ocultar excluídos
+document.getElementById("list-hidden-note").addEventListener("click",()=>{
+  showExcluded=!showExcluded;
+  renderList();
 });
 
 // ============================================================
@@ -1974,7 +2106,11 @@ function exportPNG(){
 // COPIAR LISTA PARA WHATSAPP
 // ============================================================
 function copyList(){
-  const items=buildUnifiedList();
+  const allItems=buildUnifiedList();
+  const items=allItems.filter(item=>
+    item.sources.some(s=>listSourceFilters[s]) &&
+    !excludedListItems.has(item.name.toLowerCase())
+  );
   let text="🛒 *Lista de Compras*\n";
   const today=new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"});
   text+=`_${today}_\n`;
