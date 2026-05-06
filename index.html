@@ -1374,13 +1374,14 @@ function buildUnifiedList(){
     }
   }
 
-  // 2. Estoque baixo (não-essenciais)
+  // 2. Estoque baixo (não-essenciais com qty > 0 mas abaixo do mínimo)
+  // Nota: itens com qty=0 só entram via seção 1 (essenciais) ou seção 3 (cardápio).
+  // Isso evita poluir a lista com centenas de ingredientes auto-criados zerados.
   const essencialNames = new Set(STANDARD.map(s=>s.name.toLowerCase()));
   for(const item of pantry){
     if(essencialNames.has(item.name.toLowerCase())) continue;
-    if(item.qty <= 1){
-      const reason = item.qty === 0 ? "Zerado" : "Baixo";
-      add(item.name, Math.max(1, 2-item.qty), item.unit, item.category, reason, "baixo");
+    if(item.qty > 0 && item.qty <= 1){
+      add(item.name, Math.max(1, 2-item.qty), item.unit, item.category, "Baixo", "baixo");
     }
   }
 
@@ -1482,6 +1483,18 @@ function renderList(){
   root.innerHTML="";
 
   const allItems=buildUnifiedList();
+
+  // Atualizar contadores nos pills
+  const countBySrc={essenciais:0,baixo:0,semana:0};
+  for(const item of allItems){
+    for(const src of item.sources) if(src in countBySrc) countBySrc[src]++;
+  }
+  document.querySelectorAll(".list-filter-pill[data-source]").forEach(btn=>{
+    const src=btn.dataset.source;
+    const n=countBySrc[src]||0;
+    const labels={essenciais:"🏠 Essenciais",baixo:"📦 Estoque baixo",semana:"📅 Cardápio"};
+    btn.textContent=n>0?`${labels[src]} (${n})`:(labels[src]);
+  });
 
   // Filtrar por fonte ativa
   const sourceFiltered=allItems.filter(item=>
