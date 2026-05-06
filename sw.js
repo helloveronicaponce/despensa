@@ -1,4 +1,4 @@
-const CACHE_NAME = "cozinha-inteligente-v1";
+const CACHE_NAME = "cozinha-inteligente-v2";
 const ASSETS = [
   "./index.html",
   "./manifest.json",
